@@ -362,22 +362,16 @@
                         <div class="flex justify-between items-center">
                             <h3 class="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                                 <span class="w-4 h-4 rounded-xs bg-[#03C75A] text-white text-[10px] font-black inline-flex items-center justify-center">N</span>
-                                네이버 지도 & 대중교통 API 연동
+                                네이버 지도 API 연동
                             </h3>
                             <span id="naver-api-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">기본 검색 활성</span>
                         </div>
                         <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                            네이버 NCP Client ID 및 대중교통(ODsay) API 키를 입력하면 버스 번호·지하철 호선·정류장·정확한 소요시간이 정밀 연동됩니다. (미입력 시에도 주변 역·정류장 기반 추천 경로 자동 표시)
+                            네이버 클라우드 플랫폼(Maps)에서 발급받은 Client ID를 입력하면 앱 내 경로 지도와 주소 검색이 연동됩니다. (콘솔에서 현재 접속 주소를 Web 서비스 URL로 등록해 주세요)
                         </p>
-                        <div class="space-y-2">
-                            <div class="flex gap-2">
-                                <input type="text" id="naver-ncp-client-id" placeholder="네이버 NCP Client ID (선택)" class="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-[#03C75A]">
-                                <button onclick="saveNaverClientId()" class="bg-[#03C75A] hover:bg-[#02b351] text-white px-4 py-2 rounded-xl text-xs font-bold transition">저장</button>
-                            </div>
-                            <div class="flex gap-2">
-                                <input type="text" id="odsay-api-key-input" placeholder="대중교통(ODsay) API Key (실시간 버스/지하철 노선용, 선택)" class="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-[#03C75A]">
-                                <button onclick="saveOdsayApiKey()" class="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">저장</button>
-                            </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="naver-ncp-client-id" placeholder="네이버 Maps Client ID 입력" class="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-[#03C75A]">
+                            <button onclick="saveNaverClientId()" class="bg-[#03C75A] hover:bg-[#02b351] text-white px-4 py-2 rounded-xl text-xs font-bold transition">저장</button>
                         </div>
                     </div>
 
@@ -998,7 +992,7 @@
         let naverAutocompleteTimer = null;
         let placeCoordsCache = JSON.parse(safeStorage.getItem('tp_place_coords')) || {};
         let naverNcpClientId = safeStorage.getItem('tp_naver_ncp_id') || '';
-        let odsayApiKey = safeStorage.getItem('tp_odsay_api_key') || '';
+        let naverAuthFailed = false;
 
         let peerInstance = null;
         let p2pConnections = [];
@@ -1128,11 +1122,16 @@
         }
 
         /* --- 네이버 지도 SDK 동적 로드 및 URL/좌표 유틸리티 --- */
+        window.navermap_authFailure = function() {
+            naverAuthFailed = true;
+            updateNaverApiBadge(false);
+            showToast('네이버 지도 인증 오류: NCP 콘솔의 Web 서비스 URL에 현재 도메인을 등록해 주세요.', true);
+        };
+
         function initNaverMapSDK() {
             const input = document.getElementById('naver-ncp-client-id');
             if (input) input.value = naverNcpClientId;
-            const odsayInput = document.getElementById('odsay-api-key-input');
-            if (odsayInput) odsayInput.value = odsayApiKey;
+            naverAuthFailed = false;
             updateNaverApiBadge();
 
             if (!naverNcpClientId) return;
@@ -1141,11 +1140,16 @@
 
             const script = document.createElement('script');
             script.id = 'naver-maps-sdk-script';
-            script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(naverNcpClientId)}&submodules=geocoder`;
-            script.onload = () => updateNaverApiBadge(true);
+            script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(naverNcpClientId)}&submodules=geocoder`;
+            script.onload = () => {
+                if (!naverAuthFailed) {
+                    updateNaverApiBadge(true);
+                }
+            };
             script.onerror = () => {
+                naverAuthFailed = true;
                 updateNaverApiBadge(false);
-                showToast('네이버 지도 API 키 확인이 필요합니다. 기본 검색 모드로 동작합니다.', true);
+                showToast('네이버 지도 API 스크립트 로딩에 실패했습니다. 기본 지도 모드로 동작합니다.', true);
             };
             document.head.appendChild(script);
         }
@@ -1153,9 +1157,12 @@
         function updateNaverApiBadge(sdkLoaded = false) {
             const badge = document.getElementById('naver-api-status-badge');
             if (!badge) return;
-            if ((naverNcpClientId && (sdkLoaded || (window.naver && window.naver.maps))) || odsayApiKey) {
-                badge.textContent = '정밀 API 연동됨';
+            if (naverNcpClientId && !naverAuthFailed && (sdkLoaded || (window.naver && window.naver.maps))) {
+                badge.textContent = '네이버 지도 연동됨';
                 badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#03C75A]/15 text-[#03C75A]';
+            } else if (naverNcpClientId && naverAuthFailed) {
+                badge.textContent = '인증 도메인 확인';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300';
             } else {
                 badge.textContent = '기본 검색 활성';
                 badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';
@@ -1171,22 +1178,9 @@
                 showToast('네이버 지도 Client ID가 저장되었습니다.');
             } else {
                 safeStorage.removeItem('tp_naver_ncp_id');
+                naverAuthFailed = false;
                 updateNaverApiBadge(false);
                 showToast('기본 네이버 지도 모드로 전환되었습니다.');
-            }
-        }
-
-        function saveOdsayApiKey() {
-            const input = document.getElementById('odsay-api-key-input');
-            odsayApiKey = (input ? input.value : '').trim();
-            if (odsayApiKey) {
-                safeStorage.setItem('tp_odsay_api_key', odsayApiKey);
-                updateNaverApiBadge();
-                showToast('대중교통(ODsay) API 키가 저장되었습니다.');
-            } else {
-                safeStorage.removeItem('tp_odsay_api_key');
-                updateNaverApiBadge();
-                showToast('대중교통 API 키가 해제되었습니다.');
             }
         }
 
@@ -1206,8 +1200,8 @@
             if (!cleanName) return null;
             if (placeCoordsCache[cleanName]) return placeCoordsCache[cleanName];
 
-            // 1. 네이버 지도 JS SDK Geocoder (Client ID 설정 시)
-            if (window.naver && window.naver.maps && window.naver.maps.Service) {
+            // 1. 네이버 지도 JS SDK Geocoder (Client ID 설정 및 인증 정상 시)
+            if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
                 const ncpResult = await new Promise((resolve) => {
                     window.naver.maps.Service.geocode({ query: cleanName }, (status, response) => {
                         if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses?.length > 0) {
@@ -1404,71 +1398,7 @@
         }
 
         async function fetchDetailedTransitPlans(fromCoords, toCoords, originName, destName) {
-            // 1순위: ODsay 대중교통 길찾기 API (네이버 지도와 동일한 국내 실시간 노선 DB)
-            if (odsayApiKey) {
-                try {
-                    const url = `https://api.odsay.com/v1/api/searchPubTransPathT?SX=${fromCoords.lon}&SY=${fromCoords.lat}&EX=${toCoords.lon}&EY=${toCoords.lat}&apiKey=${encodeURIComponent(odsayApiKey)}`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    if (data?.result?.path && Array.isArray(data.result.path) && data.result.path.length > 0) {
-                        currentNaverRouteState.isExactTransitApi = true;
-                        currentNaverRouteState.transitPlans = data.result.path.slice(0, 3).map((p, idx) => {
-                            const info = p.info || {};
-                            const pathTypeLabel = p.pathType === 1 ? '지하철' : (p.pathType === 2 ? '버스' : '지하철 + 버스');
-                            const steps = (p.subPath || []).map(sp => {
-                                if (sp.trafficType === 1) {
-                                    const lane = sp.lane?.[0] || {};
-                                    const lineName = lane.name || '지하철';
-                                    return {
-                                        type: 'subway',
-                                        badge: lineName.replace('수도권 ', ''),
-                                        color: getSubwayLineColor(lineName),
-                                        from: sp.startName || '출발역',
-                                        to: sp.endName || '도착역',
-                                        detail: `${sp.stationCount || 1}개역 이동 · 약 ${sp.sectionTime || 1}분`,
-                                        minutes: sp.sectionTime || 1
-                                    };
-                                } else if (sp.trafficType === 2) {
-                                    const buses = (sp.lane || []).map(l => l.busNo).filter(Boolean).slice(0, 3);
-                                    const busLabel = buses.length > 0 ? `${buses.join(', ')}번` : '시내버스';
-                                    return {
-                                        type: 'bus',
-                                        badge: busLabel,
-                                        color: '#2563eb',
-                                        from: sp.startName || '승차 정류장',
-                                        to: sp.endName || '하차 정류장',
-                                        detail: `${sp.stationCount || 1}정거장 이동 · 약 ${sp.sectionTime || 1}분`,
-                                        minutes: sp.sectionTime || 1
-                                    };
-                                } else {
-                                    return {
-                                        type: 'walk',
-                                        badge: '도보',
-                                        color: '#64748b',
-                                        from: '',
-                                        to: '',
-                                        detail: `도보 이동 ${sp.distance ? `${sp.distance}m · ` : ''}약 ${Math.max(1, sp.sectionTime || 1)}분`,
-                                        minutes: Math.max(1, sp.sectionTime || 1)
-                                    };
-                                }
-                            });
-
-                            const transfers = Math.max(0, (info.busTransitCount || 0) + (info.subwayTransitCount || 0) - 1);
-                            return {
-                                label: idx === 0 ? `추천 · ${pathTypeLabel}` : pathTypeLabel,
-                                totalMinutes: info.totalTime || 15,
-                                transfers,
-                                fare: info.payment ? `${Number(info.payment).toLocaleString()}원` : '1,400원~',
-                                walkMinutes: info.totalWalk ? Math.max(2, Math.round(info.totalWalk / 67)) : 5,
-                                steps
-                            };
-                        });
-                        return;
-                    }
-                } catch (e) {}
-            }
-
-            // 2순위: 실제 주변 지하철역(호선) 및 버스 정류장 실시간 탐색 + 정밀 소요시간 산출
+            // 실제 주변 지하철역(호선) 및 버스 정류장 실시간 탐색 + 정밀 소요시간 산출
             const distMeters = currentNaverRouteState.distanceMeters || calcHaversineMeters(fromCoords, toCoords);
             const [originStops, destStops] = await Promise.all([
                 fetchNearbyTransitStops(fromCoords),
@@ -1722,57 +1652,65 @@
                 `;
             }
 
-            // 2. 지도 렌더링: NCP Naver Maps JS API v3 활성 시 네이티브 지도 사용, 미설정 시 벡터 경로 미니맵 렌더링
-            if (window.naver && window.naver.maps) {
-                mapBox.innerHTML = `<div id="naver-native-map-canvas" class="w-full h-full"></div>`;
-                const centerLat = (fromCoords.lat + toCoords.lat) / 2;
-                const centerLon = (fromCoords.lon + toCoords.lon) / 2;
-                const map = new window.naver.maps.Map('naver-native-map-canvas', {
-                    center: new window.naver.maps.LatLng(centerLat, centerLon),
-                    zoom: 13,
-                    zoomControl: false
-                });
+            // 2. 지도 렌더링: NCP Naver Maps JS API v3 활성 시 네이티브 지도 사용, 미설정/인증오류 시 벡터 경로 미니맵 렌더링
+            let renderedNativeMap = false;
+            if (window.naver && window.naver.maps && !naverAuthFailed) {
+                try {
+                    mapBox.innerHTML = `<div id="naver-native-map-canvas" class="w-full h-full"></div>`;
+                    const centerLat = (fromCoords.lat + toCoords.lat) / 2;
+                    const centerLon = (fromCoords.lon + toCoords.lon) / 2;
+                    const map = new window.naver.maps.Map('naver-native-map-canvas', {
+                        center: new window.naver.maps.LatLng(centerLat, centerLon),
+                        zoom: 13,
+                        zoomControl: false
+                    });
 
-                const startPos = new window.naver.maps.LatLng(fromCoords.lat, fromCoords.lon);
-                const endPos = new window.naver.maps.LatLng(toCoords.lat, toCoords.lon);
+                    const startPos = new window.naver.maps.LatLng(fromCoords.lat, fromCoords.lon);
+                    const endPos = new window.naver.maps.LatLng(toCoords.lat, toCoords.lon);
 
-                new window.naver.maps.Marker({
-                    position: startPos,
-                    map,
-                    title: originName,
-                    icon: {
-                        content: `<div style="background:#03C75A;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">출발</div>`,
-                        anchor: new window.naver.maps.Point(18, 12)
-                    }
-                });
+                    new window.naver.maps.Marker({
+                        position: startPos,
+                        map,
+                        title: originName,
+                        icon: {
+                            content: `<div style="background:#03C75A;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">출발</div>`,
+                            anchor: new window.naver.maps.Point(18, 12)
+                        }
+                    });
 
-                new window.naver.maps.Marker({
-                    position: endPos,
-                    map,
-                    title: destName,
-                    icon: {
-                        content: `<div style="background:#2563eb;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">도착</div>`,
-                        anchor: new window.naver.maps.Point(18, 12)
-                    }
-                });
+                    new window.naver.maps.Marker({
+                        position: endPos,
+                        map,
+                        title: destName,
+                        icon: {
+                            content: `<div style="background:#2563eb;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">도착</div>`,
+                            anchor: new window.naver.maps.Point(18, 12)
+                        }
+                    });
 
-                const pathPoints = (routeCoords && routeCoords.length > 1)
-                    ? routeCoords.map(c => new window.naver.maps.LatLng(c.lat, c.lon))
-                    : [startPos, endPos];
+                    const pathPoints = (routeCoords && routeCoords.length > 1)
+                        ? routeCoords.map(c => new window.naver.maps.LatLng(c.lat, c.lon))
+                        : [startPos, endPos];
 
-                new window.naver.maps.Polyline({
-                    map,
-                    path: pathPoints,
-                    strokeColor: mode === 'car' ? '#2563eb' : (mode === 'walk' ? '#f59e0b' : '#03C75A'),
-                    strokeWeight: 5,
-                    strokeOpacity: 0.9
-                });
+                    new window.naver.maps.Polyline({
+                        map,
+                        path: pathPoints,
+                        strokeColor: mode === 'car' ? '#2563eb' : (mode === 'walk' ? '#f59e0b' : '#03C75A'),
+                        strokeWeight: 5,
+                        strokeOpacity: 0.9
+                    });
 
-                const bounds = new window.naver.maps.LatLngBounds(startPos, startPos);
-                pathPoints.forEach(pt => bounds.extend(pt));
-                map.fitBounds(bounds, { top: 32, right: 32, bottom: 32, left: 32 });
-            } else {
-                // NCP 키 미설정 시에도 즉시 경로 궤적을 직관적으로 보여주는 SVG 미니맵
+                    const bounds = new window.naver.maps.LatLngBounds(startPos, startPos);
+                    pathPoints.forEach(pt => bounds.extend(pt));
+                    map.fitBounds(bounds, { top: 32, right: 32, bottom: 32, left: 32 });
+                    renderedNativeMap = true;
+                } catch (e) {
+                    renderedNativeMap = false;
+                }
+            }
+
+            if (!renderedNativeMap) {
+                // NCP 키 미설정 또는 도메인 인증 제한 환경에서는 경로 궤적 미니맵으로 안전하게 표시
                 const pts = (routeCoords && routeCoords.length > 1) ? routeCoords : [fromCoords, toCoords];
                 const lats = pts.map(p => p.lat);
                 const lons = pts.map(p => p.lon);
@@ -2724,8 +2662,8 @@
             naverAutocompleteTimer = setTimeout(async () => {
                 const liveResults = [];
 
-                // 1. 네이버 클라우드 플랫폼 Geocoder API (Client ID 설정 시)
-                if (window.naver && window.naver.maps && window.naver.maps.Service) {
+                // 1. 네이버 클라우드 플랫폼 Geocoder API (Client ID 설정 및 인증 정상 시)
+                if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
                     await new Promise((resolve) => {
                         window.naver.maps.Service.geocode({ query: q }, (status, response) => {
                             if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses) {
