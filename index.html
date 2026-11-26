@@ -872,8 +872,12 @@
                 <input type="hidden" id="se-day">
                 <input type="hidden" id="se-idx">
                 <div>
-                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">시간</label>
-                    <select id="se-time" class="w-full text-sm font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"></select>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">시간 (시 / 분)</label>
+                    <div class="flex items-center gap-2">
+                        <select id="se-hour" class="flex-1 text-sm font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"></select>
+                        <span class="text-sm font-black text-slate-400">:</span>
+                        <select id="se-minute" class="flex-1 text-sm font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"></select>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">장소 / 일정명</label>
@@ -1251,6 +1255,32 @@
                 .join('&');
         }
 
+        async function geocodeViaArcGIS(query, bias) {
+            // 한국어 상호명·관광지·호텔·역 등 POI 및 주소 인식률이 높은 글로벌 지오코딩
+            try {
+                const isKorean = /[가-힣]/.test(query);
+                const locParam = bias ? `&location=${bias.lon},${bias.lat}` : '';
+                const langParam = isKorean ? '&langCode=ko' : '';
+                const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(query)}&f=json&outSR=4326&maxLocations=5&outFields=PlaceName,Place_addr,Match_addr,Country${locParam}${langParam}`;
+                const res = await fetch(url);
+                if (!res.ok) return null;
+                const data = await res.json();
+                if (!data || !Array.isArray(data.candidates) || data.candidates.length === 0) return null;
+
+                // 한국어 검색 시 대한민국(KOR) 후보 우선, 점수가 충분한 결과 선택
+                const matched = (isKorean && data.candidates.find(c => c.attributes?.Country === 'KOR' && (c.score || 0) >= 60))
+                    || data.candidates.find(c => (c.score || 0) >= 60)
+                    || data.candidates[0];
+
+                const lat = matched?.location?.y;
+                const lon = matched?.location?.x;
+                if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
+                    return { lat: Number(lat), lon: Number(lon) };
+                }
+            } catch (e) {}
+            return null;
+        }
+
         async function geocodeViaPhoton(query, bias) {
             try {
                 const biasParam = bias ? `&lat=${bias.lat}&lon=${bias.lon}` : '';
@@ -1330,19 +1360,33 @@
                     }
                 }
 
-                // 검색어 후보 목록 생성 (원문 -> 띄어쓰기 보정 -> 도시명 결합)
+                // 검색어 후보 목록 생성 (도시명 결합 -> 원문 -> 띄어쓰기 보정)
                 const cityHint = (tripMeta.city || '').trim();
                 const spacedVariant = buildKoreanSpacingVariant(cleanName);
                 const bias = getCityBiasCoords();
-                const queries = [cleanName];
-                if (spacedVariant) queries.push(spacedVariant);
+                const queries = [];
                 if (cityHint && cityHint !== 'Seoul' && !cleanName.includes(cityHint)) {
                     queries.push(`${cityHint} ${cleanName}`);
-                    if (spacedVariant) queries.push(`${cityHint} ${spacedVariant}`);
+                }
+                queries.push(cleanName);
+                if (spacedVariant) {
+                    queries.push(spacedVariant);
+                    if (cityHint && cityHint !== 'Seoul' && !spacedVariant.includes(cityHint)) {
+                        queries.push(`${cityHint} ${spacedVariant}`);
+                    }
                 }
 
-                // 2. Photon 위치 편향 POI 검색 (속도가 빠르고 요청 제한에 안전)
+                // 2. ArcGIS 고정밀 POI/주소 검색 (직접 입력한 한국어 상호·관광지·호텔 인식 최우선)
                 for (const q of queries.slice(0, 3)) {
+                    const arcCoords = await geocodeViaArcGIS(q, bias);
+                    if (arcCoords) {
+                        savePlaceCoords(cleanName, arcCoords.lat, arcCoords.lon);
+                        return arcCoords;
+                    }
+                }
+
+                // 3. Photon 위치 편향 POI 검색
+                for (const q of queries.slice(0, 2)) {
                     const photonCoords = await geocodeViaPhoton(q, bias);
                     if (photonCoords) {
                         savePlaceCoords(cleanName, photonCoords.lat, photonCoords.lon);
@@ -1350,14 +1394,14 @@
                     }
                 }
 
-                // 3. 한국어 위키백과 좌표 검색 (자동완성 없이 입력된 국내 명소·역·해수욕장 보완)
+                // 4. 한국어 위키백과 좌표 검색 (국내 명소·역·해수욕장 보완)
                 const wikiCoords = await geocodeViaWikipediaKR(spacedVariant || cleanName);
                 if (wikiCoords) {
                     savePlaceCoords(cleanName, wikiCoords.lat, wikiCoords.lon);
                     return wikiCoords;
                 }
 
-                // 4. Nominatim 실시간 POI / 주소 지오코딩 폴백
+                // 5. Nominatim 실시간 POI / 주소 지오코딩 폴백
                 for (const q of queries.slice(0, 2)) {
                     try {
                         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=3&addressdetails=1&accept-language=ko,en`);
@@ -1375,7 +1419,7 @@
                     } catch (e) {}
                 }
 
-                // 5. 도시/공항 코드 정확 일치 폴백
+                // 6. 도시/공항 코드 정확 일치 폴백
                 const preset = resolvePresetLocation(cleanName);
                 if (preset) {
                     savePlaceCoords(cleanName, preset.lat, preset.lon);
@@ -2557,13 +2601,16 @@
             const dayItems = schedules[dayKey] || [];
             preloadScheduleCoords(dayItems);
 
-            // 시간 옵션 생성 (00:00 ~ 23:55, 5분 단위)
-            let timeOptions = '';
+            // 시(00~23시) / 분(00~59분) 옵션 분리 생성
+            let hourOptions = '';
             for (let h = 0; h < 24; h++) {
-                for (let m = 0; m < 60; m += 5) {
-                    const t = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                    timeOptions += `<option value="${t}" ${t === '09:00' ? 'selected' : ''}>${t}</option>`;
-                }
+                const hh = String(h).padStart(2, '0');
+                hourOptions += `<option value="${hh}" ${hh === '09' ? 'selected' : ''}>${hh}시</option>`;
+            }
+            let minuteOptions = '';
+            for (let m = 0; m < 60; m++) {
+                const mm = String(m).padStart(2, '0');
+                minuteOptions += `<option value="${mm}" ${mm === '00' ? 'selected' : ''}>${mm}분</option>`;
             }
 
             let itemsHtml = '';
@@ -2618,11 +2665,17 @@
                 <h3 class="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <span>➕</span> Day ${currentDayTab} 새 일정 추가
                 </h3>
-                <div class="flex gap-2">
-                    <select id="sched-time-input" class="text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2.5 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500">
-                        ${timeOptions}
-                    </select>
-                    <div class="relative flex-1">
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <select id="sched-hour-input" class="text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2.5 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500">
+                            ${hourOptions}
+                        </select>
+                        <span class="text-xs font-black text-slate-400">:</span>
+                        <select id="sched-minute-input" class="text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2.5 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500">
+                            ${minuteOptions}
+                        </select>
+                    </div>
+                    <div class="relative flex-1 min-w-0">
                         <input type="text" id="sched-title-input" oninput="handlePlaceAutocomplete(this.value)" onfocus="handlePlaceAutocomplete(this.value)" onkeypress="if(event.key==='Enter') addScheduleItem()" placeholder="네이버 지도 장소 검색 또는 일정 입력" autocomplete="off" class="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-[#03C75A]">
                         <div id="sched-autocomplete-box" class="autocomplete-dropdown hidden"></div>
                     </div>
@@ -2670,82 +2723,82 @@
                 ...(placesData.sights || []).map(p => ({ name: p, cat: '저장 명소', address: '', isNaver: false })),
                 ...(placesData.food || []).map(p => ({ name: p, cat: '저장 맛집', address: '', isNaver: false })),
                 ...(placesData.shopping || []).map(p => ({ name: p, cat: '저장 쇼핑', address: '', isNaver: false }))
-            ];
-
-            if (!q) {
-                box.classList.add('hidden');
-                return;
-            }
-
-            const matchedSaved = allSaved.filter(item => item.name.toLowerCase().includes(qLower));
-            renderAutocompleteDropdown(matchedSaved);
-
-            // 디바운스 후 네이버 지도 API 및 실시간 POI 자동완성 추천 조회
-            clearTimeout(naverAutocompleteTimer);
-            if (q.length < 2) return;
-
-            naverAutocompleteTimer = setTimeout(async () => {
-                const liveResults = [];
-
-                // 1. 네이버 클라우드 플랫폼 Geocoder API (Client ID 설정 및 인증 정상 시)
-                if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
-                    await new Promise((resolve) => {
-                        window.naver.maps.Service.geocode({ query: q }, (status, response) => {
-                            if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses) {
-                                response.v2.addresses.slice(0, 4).forEach(addr => {
-                                    liveResults.push({
-                                        name: addr.roadAddress || addr.jibunAddress || q,
-                                        address: addr.jibunAddress || addr.roadAddress || '',
-                                        cat: '네이버 지도',
-                                        lat: parseFloat(addr.y),
-                                        lon: parseFloat(addr.x),
-                                        isNaver: true
-                                    });
-                                });
-                            }
-                            resolve();
-                        });
-                    });
-                }
-
-                // 2. 실시간 POI 장소 검색 (명소, 역, 식당, 카페 등 자동완성)
+                // 2. 실시간 POI 장소 검색 (ArcGIS 우선 -> Nominatim 보완)
                 try {
-                    const cityContext = getEffectiveWeatherCity();
-                    const spacedQ = buildKoreanSpacingVariant(q);
-                    const searchTerms = [q];
-                    if (spacedQ) searchTerms.push(spacedQ);
-                    if (cityContext && cityContext !== 'Seoul' && !q.includes(cityContext)) {
-                        searchTerms.push(`${q} ${cityContext}`);
-                    }
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerms[0])}&format=json&limit=5&addressdetails=1&accept-language=ko,en`);
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        data.forEach(place => {
-                            const primaryName = place.name || (place.display_name || '').split(',')[0].trim();
-                            const subAddr = (place.display_name || '').split(',').slice(1, 4).join(',').trim();
-                            const lat = parseFloat(place.lat);
-                            const lon = parseFloat(place.lon);
-                            if (primaryName && !isNaN(lat) && !isNaN(lon)) {
-                                // 자동완성을 클릭하지 않고 직접 등록해도 좌표를 재사용할 수 있도록 임시 캐싱
-                                autocompleteCoordsTemp[primaryName] = { lat, lon };
-                                autocompleteCoordsTemp[normalizePlaceKey(primaryName)] = { lat, lon };
-                                if (!autocompleteCoordsTemp[normalizePlaceKey(q)]) {
-                                    autocompleteCoordsTemp[normalizePlaceKey(q)] = { lat, lon };
+                    const bias = getCityBiasCoords();
+                    const isKorean = /[가-힣]/.test(q);
+                    const locParam = bias ? `&location=${bias.lon},${bias.lat}` : '';
+                    const langParam = isKorean ? '&langCode=ko' : '';
+                    const arcUrl = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(q)}&f=json&outSR=4326&maxLocations=5&outFields=PlaceName,Place_addr,Match_addr,Country${locParam}${langParam}`;
+                    const arcRes = await fetch(arcUrl);
+                    if (arcRes.ok) {
+                        const arcData = await arcRes.json();
+                        if (Array.isArray(arcData?.candidates)) {
+                            arcData.candidates.forEach(c => {
+                                const primaryName = (c.attributes?.PlaceName || c.address || '').split(',')[0].trim();
+                                const subAddr = c.attributes?.Place_addr || c.attributes?.Match_addr || c.address || '';
+                                const lat = Number(c.location?.y);
+                                const lon = Number(c.location?.x);
+                                if (primaryName && !isNaN(lat) && !isNaN(lon)) {
+                                    autocompleteCoordsTemp[primaryName] = { lat, lon };
+                                    autocompleteCoordsTemp[normalizePlaceKey(primaryName)] = { lat, lon };
+                                    if (!autocompleteCoordsTemp[normalizePlaceKey(q)]) {
+                                        autocompleteCoordsTemp[normalizePlaceKey(q)] = { lat, lon };
+                                    }
+                                    if (!liveResults.some(r => r.name === primaryName)) {
+                                        liveResults.push({
+                                            name: primaryName,
+                                            address: subAddr,
+                                            cat: '네이버 장소',
+                                            lat,
+                                            lon,
+                                            isNaver: true
+                                        });
+                                    }
                                 }
-                            }
-                            if (primaryName && !liveResults.some(r => r.name === primaryName)) {
-                                liveResults.push({
-                                    name: primaryName,
-                                    address: subAddr,
-                                    cat: '네이버 장소',
-                                    lat,
-                                    lon,
-                                    isNaver: true
-                                });
-                            }
-                        });
+                            });
+                        }
                     }
                 } catch (e) {}
+
+                if (liveResults.length < 3) {
+                    try {
+                        const cityContext = getEffectiveWeatherCity();
+                        const spacedQ = buildKoreanSpacingVariant(q);
+                        const searchTerms = [q];
+                        if (spacedQ) searchTerms.push(spacedQ);
+                        if (cityContext && cityContext !== 'Seoul' && !q.includes(cityContext)) {
+                            searchTerms.push(`${q} ${cityContext}`);
+                        }
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerms[0])}&format=json&limit=5&addressdetails=1&accept-language=ko,en`);
+                        const data = await res.json();
+                        if (Array.isArray(data)) {
+                            data.forEach(place => {
+                                const primaryName = place.name || (place.display_name || '').split(',')[0].trim();
+                                const subAddr = (place.display_name || '').split(',').slice(1, 4).join(',').trim();
+                                const lat = parseFloat(place.lat);
+                                const lon = parseFloat(place.lon);
+                                if (primaryName && !isNaN(lat) && !isNaN(lon)) {
+                                    autocompleteCoordsTemp[primaryName] = { lat, lon };
+                                    autocompleteCoordsTemp[normalizePlaceKey(primaryName)] = { lat, lon };
+                                    if (!autocompleteCoordsTemp[normalizePlaceKey(q)]) {
+                                        autocompleteCoordsTemp[normalizePlaceKey(q)] = { lat, lon };
+                                    }
+                                }
+                                if (primaryName && !liveResults.some(r => r.name === primaryName)) {
+                                    liveResults.push({
+                                        name: primaryName,
+                                        address: subAddr,
+                                        cat: '네이버 장소',
+                                        lat,
+                                        lon,
+                                        isNaver: true
+                                    });
+                                }
+                            });
+                        }
+                    } catch (e) {}
+                }
 
                 const currentInput = document.getElementById('sched-title-input');
                 if (!currentInput || currentInput.value.trim() !== q) return;
@@ -2769,12 +2822,15 @@
         }
 
         function addScheduleItem() {
-            const timeEl = document.getElementById('sched-time-input');
+            const hourEl = document.getElementById('sched-hour-input');
+            const minuteEl = document.getElementById('sched-minute-input');
             const titleEl = document.getElementById('sched-title-input');
             const memoEl = document.getElementById('sched-memo-input');
-            if (!timeEl || !titleEl) return;
+            if (!hourEl || !minuteEl || !titleEl) return;
 
-            const time = timeEl.value || '09:00';
+            const hour = hourEl.value || '09';
+            const minute = minuteEl.value || '00';
+            const time = `${hour}:${minute}`;
             const title = titleEl.value.trim();
             const memo = memoEl ? memoEl.value.trim() : '';
 
@@ -2813,16 +2869,25 @@
             const item = schedules[dayKey]?.[idx];
             if (!item) return;
 
-            const timeSelect = document.getElementById('se-time');
-            if (timeSelect) {
-                let opts = '';
+            const [curHour = '09', curMin = '00'] = (item.time || '09:00').split(':');
+            const hourSelect = document.getElementById('se-hour');
+            const minSelect = document.getElementById('se-minute');
+
+            if (hourSelect) {
+                let hOpts = '';
                 for (let h = 0; h < 24; h++) {
-                    for (let m = 0; m < 60; m += 5) {
-                        const t = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                        opts += `<option value="${t}" ${t === item.time ? 'selected' : ''}>${t}</option>`;
-                    }
+                    const hh = String(h).padStart(2, '0');
+                    hOpts += `<option value="${hh}" ${hh === curHour ? 'selected' : ''}>${hh}시</option>`;
                 }
-                timeSelect.innerHTML = opts;
+                hourSelect.innerHTML = hOpts;
+            }
+            if (minSelect) {
+                let mOpts = '';
+                for (let m = 0; m < 60; m++) {
+                    const mm = String(m).padStart(2, '0');
+                    mOpts += `<option value="${mm}" ${mm === curMin ? 'selected' : ''}>${mm}분</option>`;
+                }
+                minSelect.innerHTML = mOpts;
             }
 
             document.getElementById('se-day').value = day;
@@ -2840,7 +2905,9 @@
         function saveScheduleEditModal() {
             const day = parseInt(document.getElementById('se-day').value, 10);
             const idx = parseInt(document.getElementById('se-idx').value, 10);
-            const time = document.getElementById('se-time').value || '09:00';
+            const hour = document.getElementById('se-hour').value || '09';
+            const minute = document.getElementById('se-minute').value || '00';
+            const time = `${hour}:${minute}`;
             const title = document.getElementById('se-title').value.trim();
             const memo = document.getElementById('se-memo').value.trim();
 
