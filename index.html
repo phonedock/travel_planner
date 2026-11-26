@@ -8,8 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- PeerJS for WebRTC P2P Realtime Sync -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <!-- Google Identity Services (Google Drive OAuth2 Backup & Sync) -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Pretendard & Inter Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script>
@@ -369,11 +367,11 @@
                             <span id="naver-api-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">기본 검색 활성</span>
                         </div>
                         <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                            네이버 클라우드 플랫폼(Maps) Client ID를 입력하면 주소·좌표 자동완성이 강화되며, 경로 찾기 시 네이버 지도로 바로 연결됩니다.
+                            네이버 클라우드 플랫폼(NCP) Web Dynamic Map Client ID를 등록하면 주소 검색 정확도가 향상됩니다. (미입력 시에도 기본 장소 검색 및 길찾기 연동 지원)
                         </p>
                         <div class="flex gap-2">
-                            <input type="text" id="naver-ncp-client-id" placeholder="네이버 Maps Client ID 입력" class="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-[#03C75A]">
-                            <button onclick="saveNaverClientId()" class="bg-[#03C75A] hover:bg-[#02b351] text-white px-4 py-2 rounded-xl text-xs font-bold transition">저장</button>
+                            <input type="text" id="naver-ncp-id-input" placeholder="NCP Client ID 입력 (선택 사항)" class="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-[#03C75A]">
+                            <button onclick="saveNaverClientId()" class="bg-[#03C75A] hover:bg-[#02b350] text-white px-4 py-2 rounded-xl text-xs font-bold transition">저장</button>
                         </div>
                     </div>
 
@@ -382,13 +380,13 @@
                         <div class="flex justify-between items-center">
                             <h3 class="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                                 <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M7.71 3.5L1.15 15l3.43 6 6.55-11.5L7.71 3.5zm1.14 0l6.56 11.5h6.86L15.71 3.5H8.85zm6.01 12.5H1.72l3.43 6h13.14l3.43-6h-6.86z"/></svg>
-                                구글 드라이브 백업 & 동기화
+                                구글 드라이브 서버 백업 & 동기화
                             </h3>
-                            <span id="gdrive-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">미연결</span>
+                            <span id="gdrive-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">서버 연결됨</span>
                         </div>
 
                         <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                            내 구글 드라이브의 <strong>'여행 사이트 백업'</strong> 폴더에 사이트 내부 데이터를 직접 백업하고, 필요할 때 사이트 안으로 바로 불러옵니다.
+                            방문자 로그인 없이 개발자 본인의 구글 드라이브 <strong>'여행 사이트 백업'</strong> 폴더에 데이터를 직접 저장하고 불러옵니다.
                         </p>
 
                         <!-- 드라이브 백업 / 드라이브 다운 핵심 버튼 -->
@@ -403,21 +401,33 @@
                             </button>
                         </div>
 
-                        <!-- 연결됨 상태 패널 -->
-                        <div id="gdrive-connected-view" class="hidden space-y-2.5 bg-blue-50/70 dark:bg-blue-950/30 p-3.5 rounded-xl border border-blue-200/70 dark:border-blue-800/60">
+                        <div class="space-y-2.5 bg-blue-50/70 dark:bg-blue-950/30 p-3.5 rounded-xl border border-blue-200/70 dark:border-blue-800/60">
                             <div class="flex items-center justify-between gap-2">
                                 <div class="min-w-0">
-                                    <span class="text-[10px] font-bold text-blue-700 dark:text-blue-300 block">연결된 구글 계정 · 폴더: 여행 사이트 백업</span>
-                                    <span id="gdrive-account-email" class="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate block">Google 계정 연결됨</span>
-                                    <span id="gdrive-last-sync" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">마지막 동기화: 대기 중</span>
+                                    <span class="text-[10px] font-bold text-blue-700 dark:text-blue-300 block">저장 위치: 내 드라이브 / 여행 사이트 백업</span>
+                                    <span id="gdrive-last-sync" class="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mt-0.5">상태: 대기 중</span>
                                 </div>
-                                <button onclick="disconnectGoogleDrive()" class="px-2.5 py-1.5 bg-white dark:bg-slate-800 text-red-600 border border-red-200 dark:border-red-900/50 rounded-lg text-[11px] font-bold flex-shrink-0 transition">연결 해제</button>
+                                <button type="button" onclick="toggleGasGuide()" class="px-2.5 py-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-[11px] font-bold flex-shrink-0 transition">
+                                    서버 코드 확인
+                                </button>
                             </div>
 
                             <label class="flex items-center justify-between bg-white/80 dark:bg-darkCard px-3 py-2 rounded-xl border border-blue-100 dark:border-slate-700 cursor-pointer">
-                                <span class="text-xs font-bold text-slate-700 dark:text-slate-200">수정 시 드라이브 자동 동기화</span>
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-200">일정 수정 시 자동 드라이브 백업</span>
                                 <input type="checkbox" id="gdrive-autosync-toggle" onchange="toggleGdriveAutoSync(this.checked)" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
                             </label>
+
+                            <!-- Apps Script 서버 코드 및 권한 안내 패널 -->
+                            <div id="gas-guide-panel" class="hidden pt-2 border-t border-blue-200/70 dark:border-blue-800/60 space-y-2">
+                                <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                    <strong>필수 배포 설정:</strong> Apps Script 우측 상단 <b>[배포] → [새 배포]</b>에서 실행 주체는 <b>'나'</b>, 액세스 권한은 반드시 <b>'모든 사용자'</b>로 선택하세요.
+                                </p>
+                                <div class="flex justify-end">
+                                    <button type="button" onclick="copyAppsScriptCode()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[10px] font-bold transition">
+                                        Apps Script 코드 복사
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -916,6 +926,63 @@
         </div>
     </div>
 
+    <!-- Modal: 내 드라이브 서버 연동(Google Apps Script) 가이드 -->
+    <div id="gas-guide-modal" class="fixed inset-0 bg-black/60 z-[135] hidden flex items-center justify-center p-4 backdrop-blur-sm" onclick="closeGasGuideModal(event)">
+        <div class="bg-white dark:bg-darkCard w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform transition-all" onclick="event.stopPropagation()">
+            <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <span>☁️</span> 내 구글 드라이브 DB 서버 설정 방법
+                </h3>
+                <button onclick="closeGasGuideModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-5 space-y-3 text-xs text-slate-600 dark:text-slate-300 max-h-[70vh] overflow-y-auto">
+                <ol class="list-decimal pl-4 space-y-1.5 leading-relaxed">
+                    <li>본인 구글 계정으로 <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 font-bold underline">script.google.com</a> 접속 후 <strong>[새 프로젝트]</strong>를 만듭니다.</li>
+                    <li>기존 코드를 모두 지우고 아래 스크립트를 붙여넣은 뒤 저장합니다.</li>
+                    <li>우측 상단 <strong>[배포] → [새 배포]</strong> → 유형: <strong>웹 앱</strong> 선택</li>
+                    <li>다음 사용자 권한으로 실행: <strong>나(본인 이메일)</strong> / 액세스 권한: <strong>모든 사용자</strong>로 설정 후 배포합니다.</li>
+                    <li>생성된 <strong>웹 앱 URL</strong>을 복사해 설정창(또는 코드의 <code>DEFAULT_GDRIVE_WEBAPP_URL</code>)에 넣으면 모든 방문자가 내 드라이브의 <strong>'여행 사이트 백업'</strong> 폴더를 사용하게 됩니다.</li>
+                </ol>
+                <div class="relative">
+                    <pre id="gas-source-code" class="bg-slate-900 text-emerald-300 p-3 rounded-xl text-[10px] font-mono overflow-x-auto leading-relaxed select-all">const FOLDER_NAME = '여행 사이트 백업';
+const FILE_NAME = 'travel_planner_db.json';
+
+function getOrCreateFile() {
+  const folders = DriveApp.getFoldersByName(FOLDER_NAME);
+  const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(FOLDER_NAME);
+  const files = folder.getFilesByName(FILE_NAME);
+  if (files.hasNext()) return files.next();
+  return folder.createFile(FILE_NAME, '{}', MimeType.PLAIN_TEXT);
+}
+
+function doGet(e) {
+  const file = getOrCreateFile();
+  const content = file.getBlob().getDataAsString('UTF-8') || '{}';
+  const cb = e && e.parameter && e.parameter.callback;
+  if (cb) {
+    return ContentService.createTextOutput(cb + '(' + content + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(content).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const file = getOrCreateFile();
+  const raw = e.postData ? e.postData.contents : '{}';
+  const parsed = JSON.parse(raw);
+  const payload = parsed.data ? parsed.data : parsed;
+  file.setContent(JSON.stringify(payload));
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, updatedAt: new Date().toISOString() })).setMimeType(ContentService.MimeType.JSON);
+}</pre>
+                    <button type="button" onclick="copyGasSourceCode()" class="mt-2 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition">
+                        Apps Script 코드 복사하기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript Logic (Travel Planner V1.0) -->
     <script>
         const APP_VERSION = 'V1.0';
@@ -979,18 +1046,12 @@
         let naverNcpClientId = safeStorage.getItem('tp_naver_ncp_id') || '';
         let naverAuthFailed = false;
 
-        /* --- 구글 드라이브 백업 & 동기화 상태 변수 --- */
-        const GDRIVE_CLIENT_ID = '936754461387-s9ouod6eu6lh7okug07hek23ia9nuv1l.apps.googleusercontent.com';
+        /* --- 구글 드라이브 웹 앱 서버 백업 & 자동 동기화 상태 변수 --- */
+        const DEFAULT_GDRIVE_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby0T-m9RM78ETL01G8lflkyS0cJregEcwIHXJoXnGQAkW5w8j-c7e4krzwE8aWc136R/exec';
         const GDRIVE_FOLDER_NAME = '여행 사이트 백업';
-        const GDRIVE_SYNC_FILENAME = '여행_플래너_백업데이터';
-        let gdriveAutoSync = safeStorage.getItem('tp_gdrive_autosync') !== 'false';
-        let gdriveAccessToken = '';
-        let gdriveUserEmail = '';
-        let gdriveFolderId = safeStorage.getItem('tp_gdrive_folder_id') || '';
-        let gdriveFileId = safeStorage.getItem('tp_gdrive_file_id') || '';
-        let gdriveTokenClient = null;
+        const GDRIVE_SYNC_FILENAME = 'travel_planner_db.json';
+        let gdriveAutoSync = safeStorage.getItem('tp_gdrive_autosync') === 'true';
         let gdriveSyncTimer = null;
-        let pendingGdriveAction = null;
 
         let peerInstance = null;
         let p2pConnections = [];
@@ -1005,7 +1066,7 @@
             itinerary: true
         };
 
-        /* --- 공통 유틸리티 및 화면 전환 --- */
+        /* --- 공통 유틸리티 및 탭 전환 --- */
         function escapeHTML(str) {
             if (str === null || str === undefined) return '';
             return String(str)
@@ -1021,31 +1082,31 @@
             if (!toast) return;
             toast.textContent = message;
             toast.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-full shadow-xl transition-all duration-300 z-[140] text-xs font-bold tracking-wide ${
-                isError ? 'bg-red-600 text-white opacity-100' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 opacity-100'
-            }`;
+                isError ? 'bg-red-600 text-white' : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+            } opacity-100`;
             clearTimeout(toast._timer);
             toast._timer = setTimeout(() => {
                 toast.classList.remove('opacity-100');
                 toast.classList.add('opacity-0');
-            }, 2500);
+            }, 2800);
         }
 
         function showAutoSaveIndicator() {
-            const badge = document.getElementById('autosave-indicator');
-            if (badge) {
-                badge.classList.remove('opacity-0', 'translate-y-[-6px]');
-                badge.classList.add('opacity-100', 'translate-y-0');
+            const el = document.getElementById('autosave-indicator');
+            if (el) {
+                el.classList.remove('opacity-0', 'translate-y-[-6px]');
+                el.classList.add('opacity-100', 'translate-y-0');
                 clearTimeout(saveBadgeTimer);
                 saveBadgeTimer = setTimeout(() => {
-                    badge.classList.remove('opacity-100', 'translate-y-0');
-                    badge.classList.add('opacity-0', 'translate-y-[-6px]');
+                    el.classList.remove('opacity-100', 'translate-y-0');
+                    el.classList.add('opacity-0', 'translate-y-[-6px]');
                 }, 1600);
             }
             scheduleGoogleDriveAutoSync();
         }
 
         function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(sec => sec.classList.remove('active'));
             const target = document.getElementById(`tab-${tabName}`);
             if (target) target.classList.add('active');
 
@@ -1062,20 +1123,274 @@
             if (scrollArea) scrollArea.scrollTop = 0;
         }
 
-        function getEffectiveWeatherCity() {
-            if (tripMeta.city && tripMeta.city.trim()) {
-                return tripMeta.city.trim();
+        /* --- 네이버 지도 SDK 및 지오코딩·길찾기 연동 --- */
+        window.navermap_authFailure = function() {
+            naverAuthFailed = true;
+            const badge = document.getElementById('naver-api-status-badge');
+            if (badge) {
+                badge.textContent = '기본 검색 전환됨';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300';
             }
-            const depDest = flightInfo?.departure?.destName;
-            if (depDest && depDest.trim() && depDest.trim() !== '도착지') {
-                return depDest.trim();
+        };
+
+        function initNaverMapSDK() {
+            const input = document.getElementById('naver-ncp-id-input');
+            const badge = document.getElementById('naver-api-status-badge');
+            if (input) input.value = naverNcpClientId;
+
+            if (!naverNcpClientId) {
+                if (badge) {
+                    badge.textContent = '기본 검색 활성';
+                    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';
+                }
+                return;
             }
-            return 'Seoul';
+
+            if (badge) {
+                badge.textContent = 'NCP API 연동됨';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+            }
+
+            if (document.getElementById('naver-maps-sdk-script')) return;
+            const script = document.createElement('script');
+            script.id = 'naver-maps-sdk-script';
+            script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(naverNcpClientId)}&submodules=geocoder`;
+            script.async = true;
+            script.onerror = () => {
+                naverAuthFailed = true;
+            };
+            document.head.appendChild(script);
         }
 
-        function selectQuickDestination(city) {
-            if (!city) return;
-            tripMeta.city = city.trim();
+        function saveNaverClientId() {
+            const input = document.getElementById('naver-ncp-id-input');
+            if (!input) return;
+            naverNcpClientId = input.value.trim();
+            naverAuthFailed = false;
+            safeStorage.setItem('tp_naver_ncp_id', naverNcpClientId);
+            const oldScript = document.getElementById('naver-maps-sdk-script');
+            if (oldScript) oldScript.remove();
+            initNaverMapSDK();
+            showToast(naverNcpClientId ? '네이버 지도 Client ID가 저장되었습니다.' : '기본 검색 모드로 설정되었습니다.');
+        }
+
+        function normalizePlaceKey(name) {
+            return (name || '').trim().toLowerCase().replace(/\s+/g, '');
+        }
+
+        function buildKoreanSpacingVariant(query) {
+            if (!query || !/[가-힣]/.test(query)) return '';
+            const spaced = query
+                .replace(/([가-힣0-9])(해수욕장|국제공항|공항|기차역|터미널|박물관|미술관|수목원|식물원|전망대|시장|호텔|리조트|카페|공원|궁|사|역|항|산|섬|동|구)$/g, '$1 $2')
+                .trim();
+            return spaced !== query.trim() ? spaced : '';
+        }
+
+        function getCityBiasCoords() {
+            const city = getEffectiveWeatherCity();
+            const preset = resolvePresetLocation(city);
+            return preset ? { lat: preset.lat, lon: preset.lon } : null;
+        }
+
+        function savePlaceCoords(name, lat, lon) {
+            if (!name || isNaN(lat) || isNaN(lon)) return;
+            const coords = { lat: Number(lat), lon: Number(lon) };
+            placeCoordsCache[name.trim()] = coords;
+            placeCoordsCache[normalizePlaceKey(name)] = coords;
+            safeStorage.setItem('tp_place_coords', JSON.stringify(placeCoordsCache));
+        }
+
+        function getCachedPlaceCoords(name) {
+            if (!name) return null;
+            const trimmed = name.trim();
+            const norm = normalizePlaceKey(trimmed);
+            return placeCoordsCache[trimmed] || placeCoordsCache[norm] || autocompleteCoordsTemp[trimmed] || autocompleteCoordsTemp[norm] || null;
+        }
+
+        async function geocodeViaArcGIS(query) {
+            try {
+                const bias = getCityBiasCoords();
+                const isKorean = /[가-힣]/.test(query);
+                const locParam = bias ? `&location=${bias.lon},${bias.lat}` : '';
+                const langParam = isKorean ? '&langCode=ko' : '';
+                const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(query)}&f=json&outSR=4326&maxLocations=1${locParam}${langParam}`;
+                const res = await fetch(url);
+                if (!res.ok) return null;
+                const data = await res.json();
+                const top = data?.candidates?.[0];
+                if (top && top.location && !isNaN(top.location.y) && !isNaN(top.location.x)) {
+                    return { lat: Number(top.location.y), lon: Number(top.location.x) };
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        async function geocodePlaceForNaver(placeName) {
+            if (!placeName) return null;
+            const cached = getCachedPlaceCoords(placeName);
+            if (cached) return cached;
+
+            const normKey = normalizePlaceKey(placeName);
+            if (pendingGeocodePromises[normKey]) {
+                return pendingGeocodePromises[normKey];
+            }
+
+            pendingGeocodePromises[normKey] = (async () => {
+                const trimmed = placeName.trim();
+                const spaced = buildKoreanSpacingVariant(trimmed);
+                const city = getEffectiveWeatherCity();
+                const queries = [trimmed];
+                if (spaced) queries.push(spaced);
+                if (city && city !== 'Seoul' && !trimmed.includes(city)) {
+                    queries.push(`${city} ${trimmed}`);
+                }
+
+                // 1. 네이버 Maps JS SDK Geocoder
+                if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
+                    const ncpCoord = await new Promise((resolve) => {
+                        window.naver.maps.Service.geocode({ query: trimmed }, (status, response) => {
+                            if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses?.length > 0) {
+                                const top = response.v2.addresses[0];
+                                resolve({ lat: parseFloat(top.y), lon: parseFloat(top.x) });
+                            } else {
+                                resolve(null);
+                            }
+                        });
+                    });
+                    if (ncpCoord && !isNaN(ncpCoord.lat) && !isNaN(ncpCoord.lon)) {
+                        savePlaceCoords(trimmed, ncpCoord.lat, ncpCoord.lon);
+                        return ncpCoord;
+                    }
+                }
+
+                // 2. ArcGIS POI/주소 검색
+                for (const q of queries) {
+                    const arcCoord = await geocodeViaArcGIS(q);
+                    if (arcCoord) {
+                        savePlaceCoords(trimmed, arcCoord.lat, arcCoord.lon);
+                        return arcCoord;
+                    }
+                }
+
+                // 3. Nominatim 폴백
+                for (const q of queries) {
+                    try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ko,en`);
+                        const data = await res.json();
+                        if (Array.isArray(data) && data.length > 0) {
+                            const lat = parseFloat(data[0].lat);
+                            const lon = parseFloat(data[0].lon);
+                            if (!isNaN(lat) && !isNaN(lon)) {
+                                savePlaceCoords(trimmed, lat, lon);
+                                return { lat, lon };
+                            }
+                        }
+                    } catch (e) {}
+                }
+
+                // 4. 도시 단위 프리셋 최후 폴백
+                const preset = resolvePresetLocation(trimmed);
+                if (preset) {
+                    savePlaceCoords(trimmed, preset.lat, preset.lon);
+                    return { lat: preset.lat, lon: preset.lon };
+                }
+
+                return null;
+            })();
+
+            try {
+                return await pendingGeocodePromises[normKey];
+            } finally {
+                delete pendingGeocodePromises[normKey];
+            }
+        }
+
+        function preloadScheduleCoords(items) {
+            if (!Array.isArray(items)) return;
+            items.forEach(item => {
+                if (item?.title && !getCachedPlaceCoords(item.title)) {
+                    geocodePlaceForNaver(item.title);
+                }
+            });
+        }
+
+        function getNaverPlaceSearchUrl(placeName) {
+            const q = encodeURIComponent((placeName || '').trim());
+            return `https://map.naver.com/p/search/${q}`;
+        }
+
+        async function openNaverRouteBetween(originName, destName) {
+            const startText = (originName || '').trim();
+            const endText = (destName || '').trim();
+            if (!startText || !endText) return;
+
+            const [startCoord, endCoord] = await Promise.all([
+                geocodePlaceForNaver(startText),
+                geocodePlaceForNaver(endText)
+            ]);
+
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const encStartName = encodeURIComponent(startText).replace(/\+/g, '%20');
+            const encEndName = encodeURIComponent(endText).replace(/\+/g, '%20');
+
+            if (isMobile) {
+                if (startCoord && endCoord) {
+                    const params = `slat=${startCoord.lat}&slng=${startCoord.lon}&sname=${encStartName}&dlat=${endCoord.lat}&dlng=${endCoord.lon}&dname=${encEndName}&appname=travel.planner.v1`;
+                    if (/Android/i.test(navigator.userAgent)) {
+                        window.location.href = `intent://route/public?${params}#Intent;scheme=nmap;package=com.nhn.android.nmap;end`;
+                    } else {
+                        window.location.href = `nmap://route/public?${params}`;
+                    }
+                    return;
+                } else if (endCoord) {
+                    const params = `dlat=${endCoord.lat}&dlng=${endCoord.lon}&dname=${encEndName}&appname=travel.planner.v1`;
+                    if (/Android/i.test(navigator.userAgent)) {
+                        window.location.href = `intent://route/public?${params}#Intent;scheme=nmap;package=com.nhn.android.nmap;end`;
+                    } else {
+                        window.location.href = `nmap://route/public?${params}`;
+                    }
+                    return;
+                } else {
+                    const q = encodeURIComponent(`${startText}에서 ${endText}`);
+                    if (/Android/i.test(navigator.userAgent)) {
+                        window.location.href = `intent://search?query=${q}&appname=travel.planner.v1#Intent;scheme=nmap;package=com.nhn.android.nmap;end`;
+                    } else {
+                        window.location.href = `nmap://search?query=${q}&appname=travel.planner.v1`;
+                    }
+                    return;
+                }
+            }
+
+            // 데스크톱 브라우저: 네이버 지도 길찾기 웹
+            if (startCoord && endCoord) {
+                const toMercator = (lat, lon) => {
+                    const x = lon * 20037508.34 / 180;
+                    let y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180);
+                    y = y * 20037508.34 / 180;
+                    return `${x.toFixed(6)},${y.toFixed(6)}`;
+                };
+                const sMerc = toMercator(startCoord.lat, startCoord.lon);
+                const eMerc = toMercator(endCoord.lat, endCoord.lon);
+                const webUrl = `https://map.naver.com/p/directions/${sMerc},${encStartName},,PLACE_POI/${eMerc},${encEndName},,PLACE_POI/-/transit?c=13.00,0,0,0,dh`;
+                window.open(webUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                const webFallback = `https://map.naver.com/p/search/${encodeURIComponent(startText + ' ' + endText)}`;
+                window.open(webFallback, '_blank', 'noopener,noreferrer');
+            }
+        }
+
+        /* --- 여행 기본 정보 UI 및 목적지 연동 --- */
+        function getEffectiveWeatherCity() {
+            const metaCity = (tripMeta?.city || '').trim();
+            if (metaCity && metaCity !== 'Seoul') return metaCity;
+            const flightDest = (flightInfo?.departure?.destName || '').trim();
+            if (flightDest && flightDest !== '도착지') return flightDest;
+            return metaCity || 'Seoul';
+        }
+
+        function selectQuickDestination(cityVal) {
+            if (!cityVal) return;
+            tripMeta.city = cityVal;
             safeStorage.setItem('tp_meta', JSON.stringify(tripMeta));
             broadcastP2PUpdate('meta', tripMeta);
             renderTripMetaUI();
@@ -1084,25 +1399,29 @@
         }
 
         function renderTripMetaUI() {
-            const effectiveCity = getEffectiveWeatherCity();
-            const totalDays = tripMeta.totalDays || 1;
+            const title = tripMeta.title || '나만의 즐거운 여행';
+            const city = getEffectiveWeatherCity();
+            const days = tripMeta.totalDays || 1;
 
             const headerTitle = document.getElementById('header-trip-title');
             const headerSub = document.getElementById('header-trip-subtitle');
             const ddayBadge = document.getElementById('header-dday-badge');
+            const weatherCityLabel = document.getElementById('weather-city-label');
+            const homeSelect = document.getElementById('home-destination-select');
             const settingsTitle = document.getElementById('settings-trip-title');
             const settingsCity = document.getElementById('settings-trip-city');
             const settingsDays = document.getElementById('settings-trip-days');
-            const homeDestSelect = document.getElementById('home-destination-select');
 
-            if (headerTitle) headerTitle.textContent = tripMeta.title || '나만의 즐거운 여행';
-            if (headerSub) headerSub.textContent = `📍 ${effectiveCity} · 총 ${totalDays}일 일정`;
-            if (settingsTitle) settingsTitle.textContent = tripMeta.title || '나만의 즐거운 여행';
-            if (settingsCity) settingsCity.textContent = effectiveCity;
-            if (settingsDays) settingsDays.textContent = `${totalDays}일`;
-            if (homeDestSelect) {
-                const hasOpt = Array.from(homeDestSelect.options).some(o => o.value === effectiveCity);
-                homeDestSelect.value = hasOpt ? effectiveCity : '';
+            if (headerTitle) headerTitle.textContent = title;
+            if (headerSub) headerSub.textContent = `📍 ${city} · 총 ${days}일 일정`;
+            if (weatherCityLabel) weatherCityLabel.textContent = city;
+            if (settingsTitle) settingsTitle.textContent = title;
+            if (settingsCity) settingsCity.textContent = city;
+            if (settingsDays) settingsDays.textContent = `${days}일`;
+
+            if (homeSelect) {
+                const hasOption = Array.from(homeSelect.options).some(o => o.value === city);
+                homeSelect.value = hasOption ? city : '';
             }
 
             if (ddayBadge) {
@@ -1112,8 +1431,8 @@
                     today.setHours(0, 0, 0, 0);
                     const target = new Date(depDateStr + 'T00:00:00');
                     const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
-                    if (diffDays === 0) ddayBadge.textContent = 'D-Day';
-                    else if (diffDays > 0) ddayBadge.textContent = `D-${diffDays}`;
+                    if (diffDays > 0) ddayBadge.textContent = `D-${diffDays}`;
+                    else if (diffDays === 0) ddayBadge.textContent = 'D-Day';
                     else ddayBadge.textContent = `D+${Math.abs(diffDays)}`;
                 } else {
                     ddayBadge.textContent = 'D-Day';
@@ -1121,516 +1440,115 @@
             }
         }
 
-        /* --- 네이버 지도 SDK 동적 로드 및 URL/좌표 유틸리티 --- */
-        window.navermap_authFailure = function() {
-            naverAuthFailed = true;
-            updateNaverApiBadge(false);
-            showToast('네이버 지도 인증 오류: NCP 콘솔의 Web 서비스 URL에 현재 도메인을 등록해 주세요.', true);
-        };
-
-        function initNaverMapSDK() {
-            const input = document.getElementById('naver-ncp-client-id');
-            if (input) input.value = naverNcpClientId;
-            naverAuthFailed = false;
-            updateNaverApiBadge();
-
-            if (!naverNcpClientId) return;
-            const existing = document.getElementById('naver-maps-sdk-script');
-            if (existing) existing.remove();
-
-            const script = document.createElement('script');
-            script.id = 'naver-maps-sdk-script';
-            script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(naverNcpClientId)}&submodules=geocoder`;
-            script.onload = () => {
-                if (!naverAuthFailed) {
-                    updateNaverApiBadge(true);
-                }
-            };
-            script.onerror = () => {
-                naverAuthFailed = true;
-                updateNaverApiBadge(false);
-                showToast('네이버 지도 API 스크립트 로딩에 실패했습니다. 기본 지도 모드로 동작합니다.', true);
-            };
-            document.head.appendChild(script);
+        /* --- 구글 드라이브 웹 앱 서버 백업 & 자동 동기화 엔진 --- */
+        function openGasGuideModal() {
+            const modal = document.getElementById('gas-guide-modal');
+            if (modal) modal.classList.remove('hidden');
         }
 
-        function updateNaverApiBadge(sdkLoaded = false) {
-            const badge = document.getElementById('naver-api-status-badge');
-            if (!badge) return;
-            if (naverNcpClientId && !naverAuthFailed && (sdkLoaded || (window.naver && window.naver.maps))) {
-                badge.textContent = '네이버 지도 연동됨';
-                badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#03C75A]/15 text-[#03C75A]';
-            } else if (naverNcpClientId && naverAuthFailed) {
-                badge.textContent = '인증 도메인 확인';
-                badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300';
-            } else {
-                badge.textContent = '기본 검색 활성';
-                badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';
-            }
+        function closeGasGuideModal(e) {
+            if (e && e.target !== e.currentTarget) return;
+            const modal = document.getElementById('gas-guide-modal');
+            if (modal) modal.classList.add('hidden');
         }
 
-        function saveNaverClientId() {
-            const input = document.getElementById('naver-ncp-client-id');
-            naverNcpClientId = (input ? input.value : '').trim();
-            if (naverNcpClientId) {
-                safeStorage.setItem('tp_naver_ncp_id', naverNcpClientId);
-                initNaverMapSDK();
-                showToast('네이버 지도 Client ID가 저장되었습니다.');
-            } else {
-                safeStorage.removeItem('tp_naver_ncp_id');
-                naverAuthFailed = false;
-                updateNaverApiBadge(false);
-                showToast('기본 네이버 지도 모드로 전환되었습니다.');
-            }
+        function copyGasSourceCode() {
+            copyAppsScriptCode();
         }
 
-        function savePlaceCoords(name, lat, lon) {
-            if (!name || lat == null || lon == null || isNaN(lat) || isNaN(lon)) return;
-            const trimmed = name.trim();
-            const coords = { lat: Number(lat), lon: Number(lon) };
-            placeCoordsCache[trimmed] = coords;
-            const normKey = normalizePlaceKey(trimmed);
-            if (normKey) placeCoordsCache[normKey] = coords;
-            safeStorage.setItem('tp_place_coords', JSON.stringify(placeCoordsCache));
-        }
-
-        function normalizePlaceKey(name) {
-            return (name || '').trim().toLowerCase().replace(/\s+/g, '');
-        }
-
-        function getCachedPlaceCoords(name) {
-            const trimmed = (name || '').trim();
-            if (!trimmed) return null;
-            const normKey = normalizePlaceKey(trimmed);
-            return placeCoordsCache[trimmed] || placeCoordsCache[normKey] || autocompleteCoordsTemp[trimmed] || autocompleteCoordsTemp[normKey] || null;
-        }
-
-        function buildKoreanSpacingVariant(query) {
-            // "해운대해수욕장" -> "해운대 해수욕장" 등 붙여 쓴 한국어 지명 자동 분리
-            const spaced = query.replace(
-                /([가-힣0-9])(해수욕장|국제공항|공항|터미널|기차역|지하철역|역|공원|시장|타워|호텔|리조트|박물관|미술관|아쿠아리움|전망대|대교|마을|거리|광장|백화점|아울렛|수목원|비치|파크)$/g,
-                '$1 $2'
-            );
-            return spaced !== query ? spaced : null;
-        }
-
-        function getNaverPlaceSearchUrl(placeName) {
-            const query = `${placeName}`.trim();
-            return `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
-        }
-
-        function wgs84ToWebMercator(lat, lon) {
-            const x = Number(lon) * 20037508.34 / 180;
-            let y = Math.log(Math.tan((90 + Number(lat)) * Math.PI / 360)) / (Math.PI / 180);
-            y = y * 20037508.34 / 180;
-            return { x: x.toFixed(6), y: y.toFixed(6) };
-        }
-
-        function preloadScheduleCoords(dayItems) {
-            if (!Array.isArray(dayItems)) return;
-            dayItems.forEach((item, index) => {
-                if (item && item.title && !getCachedPlaceCoords(item.title)) {
-                    setTimeout(() => {
-                        geocodePlaceForNaver(item.title);
-                    }, index * 650);
-                }
-            });
-        }
-
-        function getCityBiasCoords() {
-            const cityHint = getEffectiveWeatherCity();
-            const preset = resolvePresetLocation(cityHint);
-            if (preset) return { lat: preset.lat, lon: preset.lon };
-            if (cachedForecastData && cachedForecastData.latitude != null && cachedForecastData.longitude != null) {
-                return { lat: Number(cachedForecastData.latitude), lon: Number(cachedForecastData.longitude) };
-            }
-            return null;
-        }
-
-        function buildNaverAppQuery(paramsObj) {
-            // URLSearchParams는 공백을 '+'로 치환하므로 네이버 지도 앱 호환을 위해 encodeURIComponent(%20) 사용
-            return Object.entries(paramsObj)
-                .filter(([, v]) => v !== undefined && v !== null && v !== '')
-                .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-                .join('&');
-        }
-
-        async function geocodeViaArcGIS(query, bias) {
-            // 한국어 상호명·관광지·호텔·역 등 POI 및 주소 인식률이 높은 글로벌 지오코딩
-            try {
-                const isKorean = /[가-힣]/.test(query);
-                const locParam = bias ? `&location=${bias.lon},${bias.lat}` : '';
-                const langParam = isKorean ? '&langCode=ko' : '';
-                const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(query)}&f=json&outSR=4326&maxLocations=5&outFields=PlaceName,Place_addr,Match_addr,Country${locParam}${langParam}`;
-                const res = await fetch(url);
-                if (!res.ok) return null;
-                const data = await res.json();
-                if (!data || !Array.isArray(data.candidates) || data.candidates.length === 0) return null;
-
-                // 한국어 검색 시 대한민국(KOR) 후보 우선, 점수가 충분한 결과 선택
-                const matched = (isKorean && data.candidates.find(c => c.attributes?.Country === 'KOR' && (c.score || 0) >= 60))
-                    || data.candidates.find(c => (c.score || 0) >= 60)
-                    || data.candidates[0];
-
-                const lat = matched?.location?.y;
-                const lon = matched?.location?.x;
-                if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
-                    return { lat: Number(lat), lon: Number(lon) };
-                }
-            } catch (e) {}
-            return null;
-        }
-
-        async function geocodeViaPhoton(query, bias) {
-            try {
-                const biasParam = bias ? `&lat=${bias.lat}&lon=${bias.lon}` : '';
-                const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5${biasParam}`);
-                if (!res.ok) return null;
-                const data = await res.json();
-                if (!data || !Array.isArray(data.features) || data.features.length === 0) return null;
-
-                // 한국어 검색 시 대한민국 좌표 결과 우선 선택
-                const isKorean = /[가-힣]/.test(query);
-                const feat = (isKorean && data.features.find(f => {
-                    const cc = (f.properties?.countrycode || '').toUpperCase();
-                    return cc === 'KR';
-                })) || data.features[0];
-
-                const [lon, lat] = feat.geometry?.coordinates || [];
-                if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
-                    return { lat: Number(lat), lon: Number(lon) };
-                }
-            } catch (e) {}
-            return null;
-        }
-
-        async function geocodeViaWikipediaKR(query) {
-            // 국내 주요 명소·해수욕장·역·관광지 등 자동완성 없이 입력된 한국어 지명 보완
-            if (!/[가-힣]/.test(query)) return null;
-            try {
-                const url = `https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=3&prop=coordinates&format=json&origin=*`;
-                const res = await fetch(url);
-                if (!res.ok) return null;
-                const data = await res.json();
-                const pages = data?.query?.pages ? Object.values(data.query.pages) : [];
-                pages.sort((a, b) => (a.index || 99) - (b.index || 99));
-                for (const page of pages) {
-                    if (Array.isArray(page.coordinates) && page.coordinates.length > 0) {
-                        const c = page.coordinates[0];
-                        if (c.lat != null && c.lon != null && !isNaN(c.lat) && !isNaN(c.lon)) {
-                            return { lat: Number(c.lat), lon: Number(c.lon) };
-                        }
-                    }
-                }
-            } catch (e) {}
-            return null;
-        }
-
-        async function geocodePlaceForNaver(placeName) {
-            const cleanName = (placeName || '').trim();
-            if (!cleanName) return null;
-
-            const cached = getCachedPlaceCoords(cleanName);
-            if (cached) {
-                savePlaceCoords(cleanName, cached.lat, cached.lon);
-                return cached;
-            }
-
-            const normKey = normalizePlaceKey(cleanName);
-            if (pendingGeocodePromises[normKey]) {
-                return pendingGeocodePromises[normKey];
-            }
-
-            const task = (async () => {
-                // 1. 네이버 지도 JS SDK Geocoder (Client ID 설정 및 인증 정상 시 - 주소 검색용)
-                if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
-                    const ncpResult = await new Promise((resolve) => {
-                        window.naver.maps.Service.geocode({ query: cleanName }, (status, response) => {
-                            if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses?.length > 0) {
-                                const addr = response.v2.addresses[0];
-                                resolve({ lat: parseFloat(addr.y), lon: parseFloat(addr.x) });
-                            } else {
-                                resolve(null);
-                            }
-                        });
-                    });
-                    if (ncpResult && !isNaN(ncpResult.lat) && !isNaN(ncpResult.lon)) {
-                        savePlaceCoords(cleanName, ncpResult.lat, ncpResult.lon);
-                        return ncpResult;
-                    }
-                }
-
-                // 검색어 후보 목록 생성 (도시명 결합 -> 원문 -> 띄어쓰기 보정)
-                const cityHint = (tripMeta.city || '').trim();
-                const spacedVariant = buildKoreanSpacingVariant(cleanName);
-                const bias = getCityBiasCoords();
-                const queries = [];
-                if (cityHint && cityHint !== 'Seoul' && !cleanName.includes(cityHint)) {
-                    queries.push(`${cityHint} ${cleanName}`);
-                }
-                queries.push(cleanName);
-                if (spacedVariant) {
-                    queries.push(spacedVariant);
-                    if (cityHint && cityHint !== 'Seoul' && !spacedVariant.includes(cityHint)) {
-                        queries.push(`${cityHint} ${spacedVariant}`);
-                    }
-                }
-
-                // 2. ArcGIS 고정밀 POI/주소 검색 (직접 입력한 한국어 상호·관광지·호텔 인식 최우선)
-                for (const q of queries.slice(0, 3)) {
-                    const arcCoords = await geocodeViaArcGIS(q, bias);
-                    if (arcCoords) {
-                        savePlaceCoords(cleanName, arcCoords.lat, arcCoords.lon);
-                        return arcCoords;
-                    }
-                }
-
-                // 3. Photon 위치 편향 POI 검색
-                for (const q of queries.slice(0, 2)) {
-                    const photonCoords = await geocodeViaPhoton(q, bias);
-                    if (photonCoords) {
-                        savePlaceCoords(cleanName, photonCoords.lat, photonCoords.lon);
-                        return photonCoords;
-                    }
-                }
-
-                // 4. 한국어 위키백과 좌표 검색 (국내 명소·역·해수욕장 보완)
-                const wikiCoords = await geocodeViaWikipediaKR(spacedVariant || cleanName);
-                if (wikiCoords) {
-                    savePlaceCoords(cleanName, wikiCoords.lat, wikiCoords.lon);
-                    return wikiCoords;
-                }
-
-                // 5. Nominatim 실시간 POI / 주소 지오코딩 폴백
-                for (const q of queries.slice(0, 2)) {
-                    try {
-                        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=3&addressdetails=1&accept-language=ko,en`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (Array.isArray(data) && data.length > 0) {
-                                const matched = (cityHint && data.find(d => (d.display_name || '').includes(cityHint))) || data[0];
-                                const coords = { lat: parseFloat(matched.lat), lon: parseFloat(matched.lon) };
-                                if (!isNaN(coords.lat) && !isNaN(coords.lon)) {
-                                    savePlaceCoords(cleanName, coords.lat, coords.lon);
-                                    return coords;
-                                }
-                            }
-                        }
-                    } catch (e) {}
-                }
-
-                // 6. 도시/공항 코드 정확 일치 폴백
-                const preset = resolvePresetLocation(cleanName);
-                if (preset) {
-                    savePlaceCoords(cleanName, preset.lat, preset.lon);
-                    return { lat: preset.lat, lon: preset.lon };
-                }
-
-                return null;
-            })();
-
-            pendingGeocodePromises[normKey] = task;
-            try {
-                return await task;
-            } finally {
-                delete pendingGeocodePromises[normKey];
-            }
-        }
-
-        async function openNaverRouteBetween(fromTitle, toTitle) {
-            const originName = (fromTitle || '').trim();
-            const destName = (toTitle || '').trim();
-            if (!originName || !destName) return;
-
-            const ua = navigator.userAgent || '';
-            const isAndroid = /Android/i.test(ua);
-            const isIOS = /iPhone|iPad|iPod/i.test(ua);
-            const isMobile = isAndroid || isIOS;
-
-            let pendingWin = null;
-            if (!isMobile) {
-                // PC에서 비동기 좌표 조회 시 팝업 차단을 방지하기 위해 빈 탭을 먼저 확보
-                pendingWin = window.open('about:blank', '_blank');
-            }
-
-            // 캐시된 좌표 우선 사용, 미등록 장소는 병렬 조회로 지연 최소화
-            let fromCoords = getCachedPlaceCoords(originName);
-            let toCoords = getCachedPlaceCoords(destName);
-
-            if (!fromCoords || !toCoords) {
-                showToast('장소 위치 확인 후 네이버 지도로 연결 중...');
-                const [resolvedFrom, resolvedTo] = await Promise.all([
-                    fromCoords ? Promise.resolve(fromCoords) : geocodePlaceForNaver(originName),
-                    toCoords ? Promise.resolve(toCoords) : geocodePlaceForNaver(destName)
-                ]);
-                fromCoords = resolvedFrom;
-                toCoords = resolvedTo;
-            }
-
-            if (isMobile) {
-                const appName = window.location.hostname || 'travel.planner.v1';
-                // 모바일은 웹 페이지 중복 이동 없이 네이버 지도 앱으로만 1회 직접 호출
-                if (toCoords) {
-                    const paramsObj = {
-                        dlat: Number(toCoords.lat).toFixed(7),
-                        dlng: Number(toCoords.lon).toFixed(7),
-                        dname: destName,
-                        appname: appName
-                    };
-                    if (fromCoords) {
-                        paramsObj.slat = Number(fromCoords.lat).toFixed(7);
-                        paramsObj.slng = Number(fromCoords.lon).toFixed(7);
-                        paramsObj.sname = originName;
-                    }
-
-                    const queryStr = buildNaverAppQuery(paramsObj);
-
-                    if (isAndroid) {
-                        // 웹 폴백(S.browser_fallback_url)을 제거하여 앱으로만 1회 실행
-                        const intentUrl = `intent://route/public?${queryStr}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
-                        window.location.href = intentUrl;
-                    } else {
-                        // iOS: 웹 폴백 타이머 제거로 이중 길찾기 방지
-                        window.location.href = `nmap://route/public?${queryStr}`;
-                    }
-                } else {
-                    // 도착지 좌표를 끝내 찾지 못한 경우에도 앱 내부 검색으로만 연결
-                    const searchQuery = buildNaverAppQuery({ query: destName, appname: appName });
-                    showToast('정확한 좌표를 찾지 못해 네이버 지도 앱 검색으로 연결합니다.');
-                    if (isAndroid) {
-                        window.location.href = `intent://search?${searchQuery}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
-                    } else {
-                        window.location.href = `nmap://search?${searchQuery}`;
-                    }
-                }
-                return;
-            }
-
-            // PC 환경: 네이버 지도 대중교통 길찾기 웹 URL (EPSG:3857 좌표 기반)
-            let webDirectionsUrl = `https://map.naver.com/p/search/${encodeURIComponent(destName)}`;
-            if (fromCoords && toCoords) {
-                const s = wgs84ToWebMercator(fromCoords.lat, fromCoords.lon);
-                const e = wgs84ToWebMercator(toCoords.lat, toCoords.lon);
-                webDirectionsUrl = `https://map.naver.com/p/directions/${s.x},${s.y},${encodeURIComponent(originName)},,/${e.x},${e.y},${encodeURIComponent(destName)},,/-/transit`;
-            } else if (toCoords) {
-                const e = wgs84ToWebMercator(toCoords.lat, toCoords.lon);
-                webDirectionsUrl = `https://map.naver.com/p/directions/-/${e.x},${e.y},${encodeURIComponent(destName)},,/-/transit`;
-            }
-
-            if (pendingWin && !pendingWin.closed) {
-                pendingWin.location.href = webDirectionsUrl;
-            } else {
-                window.open(webDirectionsUrl, '_blank', 'noopener,noreferrer');
-            }
-        }
-
-        /* --- 구글 드라이브 백업 & 자동 동기화 엔진 --- */
         function initGoogleDriveSync() {
             const toggle = document.getElementById('gdrive-autosync-toggle');
             if (toggle) toggle.checked = gdriveAutoSync;
-            updateGdriveUI(false);
+            updateGdriveUI('서버 연결됨', '대기 중 (드라이브 백업/다운 가능)');
         }
 
         function toggleGdriveAutoSync(enabled) {
             gdriveAutoSync = Boolean(enabled);
             safeStorage.setItem('tp_gdrive_autosync', String(gdriveAutoSync));
-            showToast(gdriveAutoSync ? '구글 드라이브 자동 동기화가 켜졌습니다.' : '구글 드라이브 자동 동기화가 꺼졌습니다.');
+            showToast(gdriveAutoSync ? '구글 드라이브 자동 백업이 켜졌습니다.' : '구글 드라이브 자동 백업이 꺼졌습니다.');
         }
 
-        function updateGdriveUI(connected, statusText = '') {
+        function toggleGasGuide() {
+            const panel = document.getElementById('gas-guide-panel');
+            if (panel) panel.classList.toggle('hidden');
+        }
+
+        function copyAppsScriptCode() {
+            const gasCode = `const FOLDER_NAME = '여행 사이트 백업';
+const FILE_NAME = 'travel_planner_db.json';
+
+function getOrCreateFolder() {
+  const folders = DriveApp.getFoldersByName(FOLDER_NAME);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(FOLDER_NAME);
+}
+
+function doGet(e) {
+  try {
+    const folder = getOrCreateFolder();
+    const files = folder.getFilesByName(FILE_NAME);
+    const cb = e && e.parameter && e.parameter.callback;
+    if (!files.hasNext()) {
+      const errOut = JSON.stringify({ ok: false, error: 'NO_BACKUP' });
+      return cb
+        ? ContentService.createTextOutput(cb + '(' + errOut + ')').setMimeType(ContentService.MimeType.JAVASCRIPT)
+        : ContentService.createTextOutput(errOut).setMimeType(ContentService.MimeType.JSON);
+    }
+    const content = files.next().getBlob().getDataAsString('UTF-8');
+    const okOut = JSON.stringify({ ok: true, data: JSON.parse(content) });
+    return cb
+      ? ContentService.createTextOutput(cb + '(' + okOut + ')').setMimeType(ContentService.MimeType.JAVASCRIPT)
+      : ContentService.createTextOutput(okOut).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    const failOut = JSON.stringify({ ok: false, error: err.toString() });
+    const cb = e && e.parameter && e.parameter.callback;
+    return cb
+      ? ContentService.createTextOutput(cb + '(' + failOut + ')').setMimeType(ContentService.MimeType.JAVASCRIPT)
+      : ContentService.createTextOutput(failOut).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const raw = e.postData && e.postData.contents ? e.postData.contents : '{}';
+    const body = JSON.parse(raw);
+    const payload = body.data ? body.data : body;
+    const folder = getOrCreateFolder();
+    const files = folder.getFilesByName(FILE_NAME);
+    const jsonStr = JSON.stringify(payload);
+    if (files.hasNext()) {
+      files.next().setContent(jsonStr);
+    } else {
+      folder.createFile(FILE_NAME, jsonStr, MimeType.PLAIN_TEXT);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+            const temp = document.createElement('textarea');
+            temp.value = gasCode;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast('Google Apps Script 서버 코드가 복사되었습니다!');
+        }
+
+        function updateGdriveUI(badgeText, statusText = '', isError = false) {
             const badge = document.getElementById('gdrive-status-badge');
-            const connView = document.getElementById('gdrive-connected-view');
-            const emailEl = document.getElementById('gdrive-account-email');
             const lastSyncEl = document.getElementById('gdrive-last-sync');
 
-            if (connected) {
-                if (badge) {
-                    badge.textContent = statusText || '연결됨';
-                    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
-                }
-                if (connView) connView.classList.remove('hidden');
-                if (emailEl) emailEl.textContent = gdriveUserEmail || 'Google 계정 연결됨';
-                if (lastSyncEl && statusText) lastSyncEl.textContent = statusText;
-            } else {
-                if (badge) {
-                    badge.textContent = '미연결';
-                    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
-                }
-                if (connView) connView.classList.add('hidden');
+            if (badge && badgeText) {
+                badge.textContent = badgeText;
+                badge.className = isError
+                    ? 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                    : 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
             }
-        }
-
-        function ensureGoogleDriveAuth(onAuthenticated) {
-            if (gdriveAccessToken) {
-                if (typeof onAuthenticated === 'function') onAuthenticated();
-                return;
+            if (lastSyncEl && statusText) {
+                lastSyncEl.textContent = `상태: ${statusText}`;
             }
-
-            if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) {
-                showToast('Google 로그인 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', true);
-                return;
-            }
-
-            pendingGdriveAction = onAuthenticated;
-
-            try {
-                if (!gdriveTokenClient) {
-                    gdriveTokenClient = window.google.accounts.oauth2.initTokenClient({
-                        client_id: GDRIVE_CLIENT_ID,
-                        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
-                        callback: async (tokenResponse) => {
-                            if (tokenResponse.error) {
-                                pendingGdriveAction = null;
-                                showToast('Google 계정 인증이 취소되었거나 실패했습니다.', true);
-                                return;
-                            }
-                            gdriveAccessToken = tokenResponse.access_token;
-                            await fetchGdriveUserEmail();
-                            updateGdriveUI(true, '연결 완료');
-
-                            const action = pendingGdriveAction;
-                            pendingGdriveAction = null;
-                            if (typeof action === 'function') {
-                                action();
-                            }
-                        }
-                    });
-                }
-                gdriveTokenClient.requestAccessToken({ prompt: '' });
-            } catch (e) {
-                pendingGdriveAction = null;
-                showToast('Google OAuth 인증 요청 중 오류가 발생했습니다.', true);
-            }
-        }
-
-        async function fetchGdriveUserEmail() {
-            if (!gdriveAccessToken) return;
-            try {
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-                });
-                const info = await res.json();
-                if (info && info.email) {
-                    gdriveUserEmail = info.email;
-                }
-            } catch (e) {}
-        }
-
-        function disconnectGoogleDrive() {
-            if (gdriveAccessToken && window.google?.accounts?.oauth2) {
-                try {
-                    window.google.accounts.oauth2.revoke(gdriveAccessToken, () => {});
-                } catch (e) {}
-            }
-            gdriveAccessToken = '';
-            gdriveUserEmail = '';
-            gdriveFolderId = '';
-            gdriveFileId = '';
-            safeStorage.removeItem('tp_gdrive_folder_id');
-            safeStorage.removeItem('tp_gdrive_file_id');
-            clearTimeout(gdriveSyncTimer);
-            updateGdriveUI(false);
-            showToast('구글 드라이브 연결이 해제되었습니다.');
         }
 
         function buildBackupObject() {
@@ -1678,178 +1596,140 @@
             fetchDestinationWeather();
         }
 
-        async function findOrCreateGdriveFolder(createIfMissing = true) {
-            if (!gdriveAccessToken) return null;
-
-            const q = encodeURIComponent(`name='${GDRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-            const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`, {
-                headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-            });
-            if (searchRes.status === 401) throw new Error('UNAUTHORIZED');
-            if (searchRes.ok) {
-                const data = await searchRes.json();
-                if (data.files && data.files.length > 0) {
-                    gdriveFolderId = data.files[0].id;
-                    safeStorage.setItem('tp_gdrive_folder_id', gdriveFolderId);
-                    return gdriveFolderId;
-                }
-            }
-
-            if (!createIfMissing) return null;
-
-            const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${gdriveAccessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: GDRIVE_FOLDER_NAME,
-                    mimeType: 'application/vnd.google-apps.folder'
-                })
-            });
-            if (createRes.status === 401) throw new Error('UNAUTHORIZED');
-            if (!createRes.ok) throw new Error('Folder creation failed');
-            const created = await createRes.json();
-            gdriveFolderId = created.id;
-            safeStorage.setItem('tp_gdrive_folder_id', gdriveFolderId);
-            return gdriveFolderId;
-        }
-
-        async function findGdriveBackupFile(folderId) {
-            if (!gdriveAccessToken || !folderId) return null;
-            const q = encodeURIComponent(`name='${GDRIVE_SYNC_FILENAME}' and '${folderId}' in parents and trashed=false`);
-            const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=drive`, {
-                headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-            });
-            if (res.status === 401) throw new Error('UNAUTHORIZED');
-            if (!res.ok) return null;
-            const data = await res.json();
-            return (data.files && data.files.length > 0) ? data.files[0].id : null;
-        }
-
         async function syncToGoogleDrive(manual = false) {
-            if (!gdriveAccessToken) {
-                if (manual) {
-                    ensureGoogleDriveAuth(() => syncToGoogleDrive(true));
-                }
-                return;
-            }
+            if (!DEFAULT_GDRIVE_WEBAPP_URL) return;
 
-            updateGdriveUI(true, `'${GDRIVE_FOLDER_NAME}' 폴더에 백업 중...`);
+            updateGdriveUI('전송 중...', `'${GDRIVE_FOLDER_NAME}' 폴더로 업로드 중...`, false);
+            const payloadBody = JSON.stringify({
+                action: 'save',
+                folderName: GDRIVE_FOLDER_NAME,
+                fileName: GDRIVE_SYNC_FILENAME,
+                data: buildBackupObject()
+            });
+
             try {
-                const folderId = await findOrCreateGdriveFolder(true);
-                if (!folderId) throw new Error('Folder missing');
-
-                let targetFileId = await findGdriveBackupFile(folderId);
-                const backupPayload = JSON.stringify(buildBackupObject());
-                const metadata = targetFileId
-                    ? { name: GDRIVE_SYNC_FILENAME, mimeType: 'application/json' }
-                    : { name: GDRIVE_SYNC_FILENAME, mimeType: 'application/json', parents: [folderId] };
-
-                const boundary = 'tp_gdrive_sync_boundary_v1';
-                const multipartBody =
-                    `--${boundary}\r\n` +
-                    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-                    `${JSON.stringify(metadata)}\r\n` +
-                    `--${boundary}\r\n` +
-                    `Content-Type: application/json\r\n\r\n` +
-                    `${backupPayload}\r\n` +
-                    `--${boundary}--`;
-
-                const url = targetFileId
-                    ? `https://www.googleapis.com/upload/drive/v3/files/${targetFileId}?uploadType=multipart`
-                    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
-
-                const res = await fetch(url, {
-                    method: targetFileId ? 'PATCH' : 'POST',
+                const res = await fetch(DEFAULT_GDRIVE_WEBAPP_URL, {
+                    method: 'POST',
+                    redirect: 'follow',
                     headers: {
-                        Authorization: `Bearer ${gdriveAccessToken}`,
-                        'Content-Type': `multipart/related; boundary=${boundary}`
+                        'Content-Type': 'text/plain;charset=utf-8'
                     },
-                    body: multipartBody
+                    body: payloadBody
                 });
 
-                if (res.status === 401) throw new Error('UNAUTHORIZED');
-                if (!res.ok) throw new Error('Drive upload failed');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const text = await res.text();
+                let result = {};
+                try { result = JSON.parse(text); } catch (e) {}
 
-                const result = await res.json();
-                if (result.id) {
-                    gdriveFileId = result.id;
-                    safeStorage.setItem('tp_gdrive_file_id', gdriveFileId);
+                if (result && result.ok === false) {
+                    throw new Error(result.error || 'Apps Script 오류');
                 }
 
                 const nowStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                updateGdriveUI(true, `백업 완료 (${nowStr})`);
-                if (manual) showToast(`구글 드라이브 '${GDRIVE_FOLDER_NAME}' 폴더에 백업되었습니다!`);
+                updateGdriveUI('백업 완료', `마지막 백업 (${nowStr})`, false);
+                if (manual) showToast(`내 구글 드라이브 '${GDRIVE_FOLDER_NAME}' 폴더에 백업되었습니다!`);
             } catch (err) {
-                if (err.message === 'UNAUTHORIZED') {
-                    gdriveAccessToken = '';
-                    updateGdriveUI(false);
-                    if (manual) {
-                        ensureGoogleDriveAuth(() => syncToGoogleDrive(true));
-                    } else {
-                        showToast('구글 로그인 세션이 만료되었습니다. 다시 백업 버튼을 눌러 주세요.', true);
-                    }
-                    return;
+                // 샌드박스(blob) 환경 CORS 리다이렉트 차단 시 no-cors 모드로 재전송
+                try {
+                    await fetch(DEFAULT_GDRIVE_WEBAPP_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'text/plain;charset=utf-8'
+                        },
+                        body: payloadBody
+                    });
+                    const nowStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    updateGdriveUI('백업 전송됨', `마지막 전송 (${nowStr})`, false);
+                    if (manual) showToast(`내 구글 드라이브 '${GDRIVE_FOLDER_NAME}' 폴더로 백업 요청을 전송했습니다!`);
+                } catch (fallbackErr) {
+                    console.error('Drive backup error:', fallbackErr);
+                    updateGdriveUI('전송 실패', 'Apps Script 배포 권한(모든 사용자) 확인 필요', true);
+                    if (manual) showToast('드라이브 서버 전송 실패: Apps Script 배포 권한을 [모든 사용자]로 확인해 주세요.', true);
                 }
-                updateGdriveUI(true, '백업 오류 발생');
-                if (manual) showToast('구글 드라이브 백업에 실패했습니다.', true);
             }
+        }
+
+        function fetchViaJsonp(baseUrl) {
+            return new Promise((resolve, reject) => {
+                const cbName = `__gas_cb_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+                const script = document.createElement('script');
+                const timer = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('JSONP 시간 초과'));
+                }, 10000);
+
+                function cleanup() {
+                    clearTimeout(timer);
+                    delete window[cbName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }
+
+                window[cbName] = (data) => {
+                    cleanup();
+                    resolve(data);
+                };
+
+                const sep = baseUrl.includes('?') ? '&' : '?';
+                script.src = `${baseUrl}${sep}action=load&callback=${cbName}&t=${Date.now()}`;
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error('JSONP 스크립트 로드 실패'));
+                };
+                document.head.appendChild(script);
+            });
         }
 
         async function restoreFromGoogleDrive() {
-            if (!gdriveAccessToken) {
-                ensureGoogleDriveAuth(() => restoreFromGoogleDrive());
-                return;
-            }
+            if (!DEFAULT_GDRIVE_WEBAPP_URL) return;
 
-            updateGdriveUI(true, `'${GDRIVE_FOLDER_NAME}' 폴더에서 불러오는 중...`);
+            updateGdriveUI('불러오는 중...', `'${GDRIVE_FOLDER_NAME}' 폴더에서 조회 중...`, false);
             try {
-                const folderId = await findOrCreateGdriveFolder(false);
-                if (!folderId) {
-                    updateGdriveUI(true, '백업 폴더 없음');
-                    showToast(`구글 드라이브에 '${GDRIVE_FOLDER_NAME}' 폴더가 없습니다. 먼저 드라이브 백업을 진행해 주세요.`, true);
-                    return;
+                let parsed = null;
+                try {
+                    const sep = DEFAULT_GDRIVE_WEBAPP_URL.includes('?') ? '&' : '?';
+                    const url = `${DEFAULT_GDRIVE_WEBAPP_URL}${sep}action=load&t=${Date.now()}`;
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        redirect: 'follow'
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const text = await res.text();
+                    parsed = JSON.parse(text);
+                } catch (fetchErr) {
+                    // 샌드박스 환경 CORS 차단 시 JSONP 방식으로 조회
+                    parsed = await fetchViaJsonp(DEFAULT_GDRIVE_WEBAPP_URL);
                 }
 
-                const targetId = await findGdriveBackupFile(folderId);
-                if (!targetId) {
-                    updateGdriveUI(true, '저장된 백업 데이터 없음');
-                    showToast(`'${GDRIVE_FOLDER_NAME}' 폴더에 저장된 백업 데이터가 없습니다.`, true);
-                    return;
+                if (parsed && parsed.ok === false) {
+                    if (parsed.error === 'NO_BACKUP') {
+                        updateGdriveUI('데이터 없음', '드라이브에 저장된 백업 데이터가 없습니다.', true);
+                        showToast(`'${GDRIVE_FOLDER_NAME}' 폴더에 백업 데이터가 없습니다. 먼저 드라이브 백업을 눌러 주세요.`, true);
+                        return;
+                    }
+                    throw new Error(parsed.error || 'Apps Script 조회 오류');
                 }
 
-                const res = await fetch(`https://www.googleapis.com/drive/v3/files/${targetId}?alt=media`, {
-                    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-                });
-                if (res.status === 401) throw new Error('UNAUTHORIZED');
-                if (!res.ok) throw new Error('Drive download failed');
+                const backupData = parsed.data ? parsed.data : parsed;
+                if (!backupData || (!backupData.meta && !backupData.schedules && !backupData.checklist)) {
+                    throw new Error('유효하지 않은 백업 형식');
+                }
 
-                const data = await res.json();
-                gdriveFileId = targetId;
-                safeStorage.setItem('tp_gdrive_file_id', gdriveFileId);
-
-                // 파일 다운로드가 아닌 사이트 내부 저장소(localStorage)로 즉시 반영 및 복원
-                applyBackupObject(data);
+                applyBackupObject(backupData);
 
                 const nowStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                updateGdriveUI(true, `드라이브 다운 완료 (${nowStr})`);
+                updateGdriveUI('다운 완료', `드라이브 데이터 적용 완료 (${nowStr})`, false);
                 showToast('구글 드라이브의 데이터를 사이트에 바로 불러왔습니다!');
             } catch (err) {
-                if (err.message === 'UNAUTHORIZED') {
-                    gdriveAccessToken = '';
-                    updateGdriveUI(false);
-                    ensureGoogleDriveAuth(() => restoreFromGoogleDrive());
-                    return;
-                }
-                updateGdriveUI(true, '불러오기 실패');
-                showToast('구글 드라이브에서 데이터를 불러오지 못했습니다.', true);
+                console.error('Drive restore error:', err);
+                updateGdriveUI('불러오기 실패', 'Apps Script 배포 권한(모든 사용자) 확인 필요', true);
+                showToast('드라이브 불러오기 실패: Apps Script 배포 권한을 [모든 사용자]로 확인해 주세요.', true);
             }
         }
 
         function scheduleGoogleDriveAutoSync() {
-            if (!gdriveAccessToken || !gdriveAutoSync) return;
+            if (!DEFAULT_GDRIVE_WEBAPP_URL || !gdriveAutoSync) return;
             clearTimeout(gdriveSyncTimer);
             gdriveSyncTimer = setTimeout(() => {
                 syncToGoogleDrive(false);
