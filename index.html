@@ -1228,9 +1228,72 @@
                 if (item && item.title && !getCachedPlaceCoords(item.title)) {
                     setTimeout(() => {
                         geocodePlaceForNaver(item.title);
-                    }, index * 350);
+                    }, index * 650);
                 }
             });
+        }
+
+        function getCityBiasCoords() {
+            const cityHint = getEffectiveWeatherCity();
+            const preset = resolvePresetLocation(cityHint);
+            if (preset) return { lat: preset.lat, lon: preset.lon };
+            if (cachedForecastData && cachedForecastData.latitude != null && cachedForecastData.longitude != null) {
+                return { lat: Number(cachedForecastData.latitude), lon: Number(cachedForecastData.longitude) };
+            }
+            return null;
+        }
+
+        function buildNaverAppQuery(paramsObj) {
+            // URLSearchParams는 공백을 '+'로 치환하므로 네이버 지도 앱 호환을 위해 encodeURIComponent(%20) 사용
+            return Object.entries(paramsObj)
+                .filter(([, v]) => v !== undefined && v !== null && v !== '')
+                .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+                .join('&');
+        }
+
+        async function geocodeViaPhoton(query, bias) {
+            try {
+                const biasParam = bias ? `&lat=${bias.lat}&lon=${bias.lon}` : '';
+                const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5${biasParam}`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                if (!data || !Array.isArray(data.features) || data.features.length === 0) return null;
+
+                // 한국어 검색 시 대한민국 좌표 결과 우선 선택
+                const isKorean = /[가-힣]/.test(query);
+                const feat = (isKorean && data.features.find(f => {
+                    const cc = (f.properties?.countrycode || '').toUpperCase();
+                    return cc === 'KR';
+                })) || data.features[0];
+
+                const [lon, lat] = feat.geometry?.coordinates || [];
+                if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
+                    return { lat: Number(lat), lon: Number(lon) };
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        async function geocodeViaWikipediaKR(query) {
+            // 국내 주요 명소·해수욕장·역·관광지 등 자동완성 없이 입력된 한국어 지명 보완
+            if (!/[가-힣]/.test(query)) return null;
+            try {
+                const url = `https://ko.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=3&prop=coordinates&format=json&origin=*`;
+                const res = await fetch(url);
+                if (!res.ok) return null;
+                const data = await res.json();
+                const pages = data?.query?.pages ? Object.values(data.query.pages) : [];
+                pages.sort((a, b) => (a.index || 99) - (b.index || 99));
+                for (const page of pages) {
+                    if (Array.isArray(page.coordinates) && page.coordinates.length > 0) {
+                        const c = page.coordinates[0];
+                        if (c.lat != null && c.lon != null && !isNaN(c.lat) && !isNaN(c.lon)) {
+                            return { lat: Number(c.lat), lon: Number(c.lon) };
+                        }
+                    }
+                }
+            } catch (e) {}
+            return null;
         }
 
         async function geocodePlaceForNaver(placeName) {
@@ -1270,6 +1333,7 @@
                 // 검색어 후보 목록 생성 (원문 -> 띄어쓰기 보정 -> 도시명 결합)
                 const cityHint = (tripMeta.city || '').trim();
                 const spacedVariant = buildKoreanSpacingVariant(cleanName);
+                const bias = getCityBiasCoords();
                 const queries = [cleanName];
                 if (spacedVariant) queries.push(spacedVariant);
                 if (cityHint && cityHint !== 'Seoul' && !cleanName.includes(cityHint)) {
@@ -1277,8 +1341,24 @@
                     if (spacedVariant) queries.push(`${cityHint} ${spacedVariant}`);
                 }
 
-                // 2. 실시간 POI / 주소 지오코딩 (Nominatim - 쿼리 파라미터로 언어 지정하여 CORS 프리플라이트 방지)
-                for (const q of queries) {
+                // 2. Photon 위치 편향 POI 검색 (속도가 빠르고 요청 제한에 안전)
+                for (const q of queries.slice(0, 3)) {
+                    const photonCoords = await geocodeViaPhoton(q, bias);
+                    if (photonCoords) {
+                        savePlaceCoords(cleanName, photonCoords.lat, photonCoords.lon);
+                        return photonCoords;
+                    }
+                }
+
+                // 3. 한국어 위키백과 좌표 검색 (자동완성 없이 입력된 국내 명소·역·해수욕장 보완)
+                const wikiCoords = await geocodeViaWikipediaKR(spacedVariant || cleanName);
+                if (wikiCoords) {
+                    savePlaceCoords(cleanName, wikiCoords.lat, wikiCoords.lon);
+                    return wikiCoords;
+                }
+
+                // 4. Nominatim 실시간 POI / 주소 지오코딩 폴백
+                for (const q of queries.slice(0, 2)) {
                     try {
                         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=3&addressdetails=1&accept-language=ko,en`);
                         if (res.ok) {
@@ -1295,25 +1375,7 @@
                     } catch (e) {}
                 }
 
-                // 3. Photon POI 지오코딩 폴백 (역, 해수욕장, 관광지 보조 검색)
-                for (const q of queries.slice(0, 2)) {
-                    try {
-                        const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=3`);
-                        if (photonRes.ok) {
-                            const photonData = await photonRes.json();
-                            if (photonData && Array.isArray(photonData.features) && photonData.features.length > 0) {
-                                const feat = photonData.features[0];
-                                const [lon, lat] = feat.geometry?.coordinates || [];
-                                if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
-                                    savePlaceCoords(cleanName, lat, lon);
-                                    return { lat: Number(lat), lon: Number(lon) };
-                                }
-                            }
-                        }
-                    } catch (e) {}
-                }
-
-                // 4. 도시/공항 코드 정확 일치 폴백
+                // 5. 도시/공항 코드 정확 일치 폴백
                 const preset = resolvePresetLocation(cleanName);
                 if (preset) {
                     savePlaceCoords(cleanName, preset.lat, preset.lon);
@@ -1347,17 +1409,60 @@
                 pendingWin = window.open('about:blank', '_blank');
             }
 
-            // 이미 캐시된 좌표가 있으면 지연 없이 즉시 사용하여 모바일 앱 스킴 전달 안정성 확보
+            // 캐시된 좌표 우선 사용, 미등록 장소는 병렬 조회로 지연 최소화
             let fromCoords = getCachedPlaceCoords(originName);
             let toCoords = getCachedPlaceCoords(destName);
 
             if (!fromCoords || !toCoords) {
                 showToast('장소 위치 확인 후 네이버 지도로 연결 중...');
-                if (!fromCoords) fromCoords = await geocodePlaceForNaver(originName);
-                if (!toCoords) toCoords = await geocodePlaceForNaver(destName);
+                const [resolvedFrom, resolvedTo] = await Promise.all([
+                    fromCoords ? Promise.resolve(fromCoords) : geocodePlaceForNaver(originName),
+                    toCoords ? Promise.resolve(toCoords) : geocodePlaceForNaver(destName)
+                ]);
+                fromCoords = resolvedFrom;
+                toCoords = resolvedTo;
             }
 
-            // 최신 네이버 지도 대중교통 길찾기 웹 URL (EPSG:3857 좌표 기반)
+            if (isMobile) {
+                const appName = window.location.hostname || 'travel.planner.v1';
+                // 모바일은 웹 페이지 중복 이동 없이 네이버 지도 앱으로만 1회 직접 호출
+                if (toCoords) {
+                    const paramsObj = {
+                        dlat: Number(toCoords.lat).toFixed(7),
+                        dlng: Number(toCoords.lon).toFixed(7),
+                        dname: destName,
+                        appname: appName
+                    };
+                    if (fromCoords) {
+                        paramsObj.slat = Number(fromCoords.lat).toFixed(7);
+                        paramsObj.slng = Number(fromCoords.lon).toFixed(7);
+                        paramsObj.sname = originName;
+                    }
+
+                    const queryStr = buildNaverAppQuery(paramsObj);
+
+                    if (isAndroid) {
+                        // 웹 폴백(S.browser_fallback_url)을 제거하여 앱으로만 1회 실행
+                        const intentUrl = `intent://route/public?${queryStr}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
+                        window.location.href = intentUrl;
+                    } else {
+                        // iOS: 웹 폴백 타이머 제거로 이중 길찾기 방지
+                        window.location.href = `nmap://route/public?${queryStr}`;
+                    }
+                } else {
+                    // 도착지 좌표를 끝내 찾지 못한 경우에도 앱 내부 검색으로만 연결
+                    const searchQuery = buildNaverAppQuery({ query: destName, appname: appName });
+                    showToast('정확한 좌표를 찾지 못해 네이버 지도 앱 검색으로 연결합니다.');
+                    if (isAndroid) {
+                        window.location.href = `intent://search?${searchQuery}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
+                    } else {
+                        window.location.href = `nmap://search?${searchQuery}`;
+                    }
+                }
+                return;
+            }
+
+            // PC 환경: 네이버 지도 대중교통 길찾기 웹 URL (EPSG:3857 좌표 기반)
             let webDirectionsUrl = `https://map.naver.com/p/search/${encodeURIComponent(destName)}`;
             if (fromCoords && toCoords) {
                 const s = wgs84ToWebMercator(fromCoords.lat, fromCoords.lon);
@@ -1368,48 +1473,7 @@
                 webDirectionsUrl = `https://map.naver.com/p/directions/-/${e.x},${e.y},${encodeURIComponent(destName)},,/-/transit`;
             }
 
-            if (isMobile) {
-                // 네이버 지도 앱(nmap://route/public)은 도착지 좌표(dlat, dlng)가 필수
-                if (toCoords) {
-                    const params = new URLSearchParams();
-                    if (fromCoords) {
-                        params.set('slat', Number(fromCoords.lat).toFixed(7));
-                        params.set('slng', Number(fromCoords.lon).toFixed(7));
-                        params.set('sname', originName);
-                    }
-                    params.set('dlat', Number(toCoords.lat).toFixed(7));
-                    params.set('dlng', Number(toCoords.lon).toFixed(7));
-                    params.set('dname', destName);
-                    params.set('appname', window.location.hostname || 'travel.planner.v1');
-
-                    const queryStr = params.toString();
-
-                    if (isAndroid) {
-                        // Android는 intent:// 스킴을 통해 네이버 지도 앱에 파라미터를 정확히 전달하고 미설치 시 웹으로 자동 폴백
-                        const intentUrl = `intent://route/public?${queryStr}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;S.browser_fallback_url=${encodeURIComponent(webDirectionsUrl)};end`;
-                        window.location.href = intentUrl;
-                    } else {
-                        // iOS는 nmap:// 호출 후 앱으로 정상 전환되면 웹 폴백 타이머 취소
-                        const appSchemeUrl = `nmap://route/public?${queryStr}`;
-                        let appOpened = false;
-                        const onVisibilityChange = () => {
-                            if (document.hidden) appOpened = true;
-                        };
-                        document.addEventListener('visibilitychange', onVisibilityChange, { once: true });
-                        window.location.href = appSchemeUrl;
-
-                        setTimeout(() => {
-                            document.removeEventListener('visibilitychange', onVisibilityChange);
-                            if (!appOpened && !document.hidden) {
-                                window.location.href = webDirectionsUrl;
-                            }
-                        }, 1500);
-                    }
-                } else {
-                    showToast('도착지 좌표를 찾지 못해 네이버 지도 웹으로 연결합니다.');
-                    window.location.href = webDirectionsUrl;
-                }
-            } else if (pendingWin && !pendingWin.closed) {
+            if (pendingWin && !pendingWin.closed) {
                 pendingWin.location.href = webDirectionsUrl;
             } else {
                 window.open(webDirectionsUrl, '_blank', 'noopener,noreferrer');
@@ -2794,7 +2858,7 @@
             safeStorage.setItem('tp_schedules', JSON.stringify(schedules));
             broadcastP2PUpdate('schedules', schedules);
 
-            if (!placeCoordsCache[title]) {
+            if (!getCachedPlaceCoords(title)) {
                 geocodePlaceForNaver(title);
             }
 
