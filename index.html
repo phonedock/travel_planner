@@ -2723,6 +2723,53 @@
                 ...(placesData.sights || []).map(p => ({ name: p, cat: '저장 명소', address: '', isNaver: false })),
                 ...(placesData.food || []).map(p => ({ name: p, cat: '저장 맛집', address: '', isNaver: false })),
                 ...(placesData.shopping || []).map(p => ({ name: p, cat: '저장 쇼핑', address: '', isNaver: false }))
+            ];
+
+            const matchedSaved = qLower
+                ? allSaved.filter(item => item.name.toLowerCase().includes(qLower))
+                : allSaved;
+
+            if (!q) {
+                clearTimeout(naverAutocompleteTimer);
+                renderAutocompleteDropdown(matchedSaved.slice(0, 7));
+                return;
+            }
+
+            if (matchedSaved.length > 0) {
+                renderAutocompleteDropdown(matchedSaved.slice(0, 5));
+            }
+
+            clearTimeout(naverAutocompleteTimer);
+            naverAutocompleteTimer = setTimeout(async () => {
+                const liveResults = [];
+
+                // 1. 네이버 지도 JS SDK Geocoder (Client ID 설정 및 인증 정상 시)
+                if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
+                    const ncpResults = await new Promise((resolve) => {
+                        window.naver.maps.Service.geocode({ query: q }, (status, response) => {
+                            if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses?.length > 0) {
+                                resolve(response.v2.addresses.slice(0, 3).map(addr => ({
+                                    name: addr.roadAddress || addr.jibunAddress || q,
+                                    address: addr.jibunAddress || addr.roadAddress || '',
+                                    cat: '네이버 주소',
+                                    lat: parseFloat(addr.y),
+                                    lon: parseFloat(addr.x),
+                                    isNaver: true
+                                })));
+                            } else {
+                                resolve([]);
+                            }
+                        });
+                    });
+                    ncpResults.forEach(item => {
+                        if (item.name && !isNaN(item.lat) && !isNaN(item.lon)) {
+                            autocompleteCoordsTemp[item.name] = { lat: item.lat, lon: item.lon };
+                            autocompleteCoordsTemp[normalizePlaceKey(item.name)] = { lat: item.lat, lon: item.lon };
+                            liveResults.push(item);
+                        }
+                    });
+                }
+
                 // 2. 실시간 POI 장소 검색 (ArcGIS 우선 -> Nominatim 보완)
                 try {
                     const bias = getCityBiasCoords();
