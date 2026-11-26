@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- PeerJS for WebRTC P2P Realtime Sync -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- Google Identity Services (Google Drive OAuth2 Backup & Sync) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Pretendard & Inter Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script>
@@ -362,33 +364,60 @@
                         <div class="flex justify-between items-center">
                             <h3 class="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                                 <span class="w-4 h-4 rounded-xs bg-[#03C75A] text-white text-[10px] font-black inline-flex items-center justify-center">N</span>
-                                네이버 지도 & ODsay 대중교통 API
+                                네이버 지도 API 설정
                             </h3>
                             <span id="naver-api-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">기본 검색 활성</span>
                         </div>
                         <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                            네이버 클라우드 플랫폼(Maps) Client ID를 입력하면 앱 내 경로 지도와 주소 검색이 연동됩니다.
+                            네이버 클라우드 플랫폼(Maps) Client ID를 입력하면 주소·좌표 자동완성이 강화되며, 경로 찾기 시 네이버 지도로 바로 연결됩니다.
                         </p>
                         <div class="flex gap-2">
                             <input type="text" id="naver-ncp-client-id" placeholder="네이버 Maps Client ID 입력" class="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-[#03C75A]">
                             <button onclick="saveNaverClientId()" class="bg-[#03C75A] hover:bg-[#02b351] text-white px-4 py-2 rounded-xl text-xs font-bold transition">저장</button>
                         </div>
+                    </div>
 
-                        <!-- ODsay 대중교통 API Key 설정 -->
-                        <div class="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                            <div class="flex justify-between items-center">
-                                <label class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                                    <span>🚌</span> ODsay 대중교통 API Key
-                                </label>
-                                <span id="odsay-api-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">미설정 (추정 모드)</span>
+                    <!-- 구글 드라이브 백업 & 실시간 동기화 -->
+                    <div class="bg-white dark:bg-darkCard rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 p-5 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M7.71 3.5L1.15 15l3.43 6 6.55-11.5L7.71 3.5zm1.14 0l6.56 11.5h6.86L15.71 3.5H8.85zm6.01 12.5H1.72l3.43 6h13.14l3.43-6h-6.86z"/></svg>
+                                구글 드라이브 백업 & 동기화
+                            </h3>
+                            <span id="gdrive-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">미연결</span>
+                        </div>
+
+                        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                            내 구글 드라이브의 <strong>'여행 사이트 백업'</strong> 폴더에 사이트 내부 데이터를 직접 백업하고, 필요할 때 사이트 안으로 바로 불러옵니다.
+                        </p>
+
+                        <!-- 드라이브 백업 / 드라이브 다운 핵심 버튼 -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="syncToGoogleDrive(true)" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold shadow-sm transition flex items-center justify-center gap-1.5">
+                                <span>☁️</span>
+                                <span>드라이브 백업</span>
+                            </button>
+                            <button onclick="restoreFromGoogleDrive()" class="py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5">
+                                <span>📥</span>
+                                <span>드라이브 다운</span>
+                            </button>
+                        </div>
+
+                        <!-- 연결됨 상태 패널 -->
+                        <div id="gdrive-connected-view" class="hidden space-y-2.5 bg-blue-50/70 dark:bg-blue-950/30 p-3.5 rounded-xl border border-blue-200/70 dark:border-blue-800/60">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="min-w-0">
+                                    <span class="text-[10px] font-bold text-blue-700 dark:text-blue-300 block">연결된 구글 계정 · 폴더: 여행 사이트 백업</span>
+                                    <span id="gdrive-account-email" class="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate block">Google 계정 연결됨</span>
+                                    <span id="gdrive-last-sync" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">마지막 동기화: 대기 중</span>
+                                </div>
+                                <button onclick="disconnectGoogleDrive()" class="px-2.5 py-1.5 bg-white dark:bg-slate-800 text-red-600 border border-red-200 dark:border-red-900/50 rounded-lg text-[11px] font-bold flex-shrink-0 transition">연결 해제</button>
                             </div>
-                            <div class="flex gap-2">
-                                <input type="password" id="odsay-api-key" placeholder="ODsay에서 발급받은 API Key 입력" class="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500">
-                                <button onclick="saveOdsayApiKey()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">저장</button>
-                            </div>
-                            <p class="text-[11px] text-slate-400 leading-relaxed">
-                                * ODsay Developers 콘솔에서 발급받은 키를 등록하면 실제 버스 번호, 지하철 호선, 승·하차 정류장, 정거장 수, 요금 및 정확한 소요시간이 조회됩니다. (콘솔 웹 서비스 URL에 현재 접속 도메인 등록 필요)
-                            </p>
+
+                            <label class="flex items-center justify-between bg-white/80 dark:bg-darkCard px-3 py-2 rounded-xl border border-blue-100 dark:border-slate-700 cursor-pointer">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-200">수정 시 드라이브 자동 동기화</span>
+                                <input type="checkbox" id="gdrive-autosync-toggle" onchange="toggleGdriveAutoSync(this.checked)" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
+                            </label>
                         </div>
                     </div>
 
@@ -883,73 +912,6 @@
         </div>
     </div>
 
-    <!-- Modal: 앱 내 네이버 지도 추천 경로 미리보기 -->
-    <div id="naver-route-modal" class="fixed inset-0 bg-black/60 z-[135] hidden flex items-center justify-center p-4 backdrop-blur-sm" onclick="closeNaverRouteModal(event)">
-        <div class="bg-white dark:bg-darkCard w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform transition-all flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
-            <!-- 상단 헤더 -->
-            <div class="bg-[#03C75A] px-5 py-4 text-white flex justify-between items-center flex-shrink-0">
-                <div class="flex items-center gap-2">
-                    <span class="w-6 h-6 rounded-lg bg-white text-[#03C75A] font-black text-xs inline-flex items-center justify-center shadow-2xs">N</span>
-                    <div>
-                        <h3 class="font-extrabold text-sm leading-tight">추천 경로 안내</h3>
-                        <p id="nr-subtitle" class="text-[11px] text-white/85 mt-0.5">네이버 지도 연동 경로</p>
-                    </div>
-                </div>
-                <button onclick="closeNaverRouteModal()" class="text-white/85 hover:text-white bg-black/15 p-1.5 rounded-full transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-
-            <!-- 출발지 -> 도착지 요약 -->
-            <div class="px-5 py-3 bg-slate-50 dark:bg-slate-800/70 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 text-xs flex-shrink-0">
-                <div class="flex-1 min-w-0 bg-white dark:bg-darkCard px-3 py-2 rounded-xl border border-slate-200/70 dark:border-slate-700">
-                    <span class="text-[10px] font-bold text-[#03C75A] block">출발</span>
-                    <span id="nr-origin-text" class="font-bold text-slate-800 dark:text-slate-100 truncate block">출발지</span>
-                </div>
-                <span class="text-slate-400 font-bold flex-shrink-0">→</span>
-                <div class="flex-1 min-w-0 bg-white dark:bg-darkCard px-3 py-2 rounded-xl border border-slate-200/70 dark:border-slate-700">
-                    <span class="text-[10px] font-bold text-blue-600 dark:text-blue-400 block">도착</span>
-                    <span id="nr-dest-text" class="font-bold text-slate-800 dark:text-slate-100 truncate block">도착지</span>
-                </div>
-            </div>
-
-            <!-- 이동 수단 탭 -->
-            <div class="px-5 pt-3 flex gap-1.5 flex-shrink-0">
-                <button type="button" onclick="switchRoutePreviewMode('transit')" data-rmode="transit" class="nr-mode-btn flex-1 py-2 rounded-xl text-xs font-extrabold border-2 border-[#03C75A] bg-[#03C75A]/10 text-[#02a84b] dark:text-[#23d973] transition">
-                    🚇 대중교통
-                </button>
-                <button type="button" onclick="switchRoutePreviewMode('car')" data-rmode="car" class="nr-mode-btn flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition">
-                    🚕 자동차
-                </button>
-                <button type="button" onclick="switchRoutePreviewMode('walk')" data-rmode="walk" class="nr-mode-btn flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition">
-                    🚶 도보
-                </button>
-            </div>
-
-            <!-- 지도 미리보기 및 추천 경로 정보 -->
-            <div class="p-5 space-y-3.5 overflow-y-auto">
-                <div id="nr-map-container" class="w-full h-48 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 overflow-hidden relative flex items-center justify-center">
-                    <div class="text-xs text-slate-400 animate-pulse">경로 지도를 불러오는 중...</div>
-                </div>
-
-                <div id="nr-route-details" class="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-100 dark:border-slate-700/70 space-y-2">
-                    <!-- JS에서 추천 경로 카드 렌더링 -->
-                </div>
-            </div>
-
-            <!-- 하단 네이버 지도 앱 이동 버튼 -->
-            <div class="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex gap-2 flex-shrink-0">
-                <button onclick="closeNaverRouteModal()" class="px-4 py-3 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition">
-                    닫기
-                </button>
-                <button onclick="launchExternalNaverMap()" class="flex-1 bg-[#03C75A] hover:bg-[#02b351] active:scale-[0.99] text-white py-3 px-4 rounded-xl text-xs font-extrabold shadow-md shadow-[#03C75A]/20 flex items-center justify-center gap-1.5 transition">
-                    <span class="w-4 h-4 rounded-xs bg-white text-[#03C75A] text-[10px] font-black inline-flex items-center justify-center">N</span>
-                    <span>네이버 지도 앱에서 자세히 보기</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- JavaScript Logic (Travel Planner V1.0) -->
     <script>
         const APP_VERSION = 'V1.0';
@@ -1008,9 +970,23 @@
         let cachedForecastData = null;
         let naverAutocompleteTimer = null;
         let placeCoordsCache = JSON.parse(safeStorage.getItem('tp_place_coords')) || {};
+        let autocompleteCoordsTemp = {};
+        let pendingGeocodePromises = {};
         let naverNcpClientId = safeStorage.getItem('tp_naver_ncp_id') || '';
-        let odsayApiKey = safeStorage.getItem('tp_odsay_api_key') || '';
         let naverAuthFailed = false;
+
+        /* --- 구글 드라이브 백업 & 동기화 상태 변수 --- */
+        const GDRIVE_CLIENT_ID = '936754461387-s9ouod6eu6lh7okug07hek23ia9nuv1l.apps.googleusercontent.com';
+        const GDRIVE_FOLDER_NAME = '여행 사이트 백업';
+        const GDRIVE_SYNC_FILENAME = '여행_플래너_백업데이터';
+        let gdriveAutoSync = safeStorage.getItem('tp_gdrive_autosync') !== 'false';
+        let gdriveAccessToken = '';
+        let gdriveUserEmail = '';
+        let gdriveFolderId = safeStorage.getItem('tp_gdrive_folder_id') || '';
+        let gdriveFileId = safeStorage.getItem('tp_gdrive_file_id') || '';
+        let gdriveTokenClient = null;
+        let gdriveSyncTimer = null;
+        let pendingGdriveAction = null;
 
         let peerInstance = null;
         let p2pConnections = [];
@@ -1052,14 +1028,16 @@
 
         function showAutoSaveIndicator() {
             const badge = document.getElementById('autosave-indicator');
-            if (!badge) return;
-            badge.classList.remove('opacity-0', 'translate-y-[-6px]');
-            badge.classList.add('opacity-100', 'translate-y-0');
-            clearTimeout(saveBadgeTimer);
-            saveBadgeTimer = setTimeout(() => {
-                badge.classList.remove('opacity-100', 'translate-y-0');
-                badge.classList.add('opacity-0', 'translate-y-[-6px]');
-            }, 1600);
+            if (badge) {
+                badge.classList.remove('opacity-0', 'translate-y-[-6px]');
+                badge.classList.add('opacity-100', 'translate-y-0');
+                clearTimeout(saveBadgeTimer);
+                saveBadgeTimer = setTimeout(() => {
+                    badge.classList.remove('opacity-100', 'translate-y-0');
+                    badge.classList.add('opacity-0', 'translate-y-[-6px]');
+                }, 1600);
+            }
+            scheduleGoogleDriveAutoSync();
         }
 
         function switchTab(tabName) {
@@ -1202,41 +1180,34 @@
             }
         }
 
-        function initOdsaySettings() {
-            const input = document.getElementById('odsay-api-key');
-            if (input) input.value = odsayApiKey;
-            updateOdsayApiBadge();
-        }
-
-        function updateOdsayApiBadge() {
-            const badge = document.getElementById('odsay-api-status-badge');
-            if (!badge) return;
-            if (odsayApiKey) {
-                badge.textContent = '실시간 노선 활성';
-                badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300';
-            } else {
-                badge.textContent = '미설정 (추정 모드)';
-                badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
-            }
-        }
-
-        function saveOdsayApiKey() {
-            const input = document.getElementById('odsay-api-key');
-            odsayApiKey = (input ? input.value : '').trim();
-            if (odsayApiKey) {
-                safeStorage.setItem('tp_odsay_api_key', odsayApiKey);
-                showToast('ODsay 대중교통 API Key가 저장되었습니다.');
-            } else {
-                safeStorage.removeItem('tp_odsay_api_key');
-                showToast('ODsay API Key가 해제되었습니다.');
-            }
-            updateOdsayApiBadge();
-        }
-
         function savePlaceCoords(name, lat, lon) {
             if (!name || lat == null || lon == null || isNaN(lat) || isNaN(lon)) return;
-            placeCoordsCache[name.trim()] = { lat: Number(lat), lon: Number(lon) };
+            const trimmed = name.trim();
+            const coords = { lat: Number(lat), lon: Number(lon) };
+            placeCoordsCache[trimmed] = coords;
+            const normKey = normalizePlaceKey(trimmed);
+            if (normKey) placeCoordsCache[normKey] = coords;
             safeStorage.setItem('tp_place_coords', JSON.stringify(placeCoordsCache));
+        }
+
+        function normalizePlaceKey(name) {
+            return (name || '').trim().toLowerCase().replace(/\s+/g, '');
+        }
+
+        function getCachedPlaceCoords(name) {
+            const trimmed = (name || '').trim();
+            if (!trimmed) return null;
+            const normKey = normalizePlaceKey(trimmed);
+            return placeCoordsCache[trimmed] || placeCoordsCache[normKey] || autocompleteCoordsTemp[trimmed] || autocompleteCoordsTemp[normKey] || null;
+        }
+
+        function buildKoreanSpacingVariant(query) {
+            // "해운대해수욕장" -> "해운대 해수욕장" 등 붙여 쓴 한국어 지명 자동 분리
+            const spaced = query.replace(
+                /([가-힣0-9])(해수욕장|국제공항|공항|터미널|기차역|지하철역|역|공원|시장|타워|호텔|리조트|박물관|미술관|아쿠아리움|전망대|대교|마을|거리|광장|백화점|아울렛|수목원|비치|파크)$/g,
+                '$1 $2'
+            );
+            return spaced !== query ? spaced : null;
         }
 
         function getNaverPlaceSearchUrl(placeName) {
@@ -1247,72 +1218,99 @@
         async function geocodePlaceForNaver(placeName) {
             const cleanName = (placeName || '').trim();
             if (!cleanName) return null;
-            if (placeCoordsCache[cleanName]) return placeCoordsCache[cleanName];
 
-            // 1. 네이버 지도 JS SDK Geocoder (Client ID 설정 및 인증 정상 시)
-            if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
-                const ncpResult = await new Promise((resolve) => {
-                    window.naver.maps.Service.geocode({ query: cleanName }, (status, response) => {
-                        if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses?.length > 0) {
-                            const addr = response.v2.addresses[0];
-                            resolve({ lat: parseFloat(addr.y), lon: parseFloat(addr.x) });
-                        } else {
-                            resolve(null);
-                        }
-                    });
-                });
-                if (ncpResult && !isNaN(ncpResult.lat) && !isNaN(ncpResult.lon)) {
-                    savePlaceCoords(cleanName, ncpResult.lat, ncpResult.lon);
-                    return ncpResult;
-                }
+            const cached = getCachedPlaceCoords(cleanName);
+            if (cached) {
+                savePlaceCoords(cleanName, cached.lat, cached.lon);
+                return cached;
             }
 
-            // 2. 실시간 POI / 주소 지오코딩 (직접 입력한 장소명 우선 검색 -> 도시명 결합 재검색)
-            const cityHint = (tripMeta.city || '').trim();
-            const queries = [cleanName];
-            if (cityHint && cityHint !== 'Seoul' && !cleanName.includes(cityHint)) {
-                queries.push(`${cityHint} ${cleanName}`);
+            const normKey = normalizePlaceKey(cleanName);
+            if (pendingGeocodePromises[normKey]) {
+                return pendingGeocodePromises[normKey];
             }
 
-            for (const q of queries) {
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=3&addressdetails=1`, {
-                        headers: { 'Accept-Language': 'ko,en' }
+            const task = (async () => {
+                // 1. 네이버 지도 JS SDK Geocoder (Client ID 설정 및 인증 정상 시 - 주소 검색용)
+                if (window.naver && window.naver.maps && window.naver.maps.Service && !naverAuthFailed) {
+                    const ncpResult = await new Promise((resolve) => {
+                        window.naver.maps.Service.geocode({ query: cleanName }, (status, response) => {
+                            if (status === window.naver.maps.Service.Status.OK && response?.v2?.addresses?.length > 0) {
+                                const addr = response.v2.addresses[0];
+                                resolve({ lat: parseFloat(addr.y), lon: parseFloat(addr.x) });
+                            } else {
+                                resolve(null);
+                            }
+                        });
                     });
-                    const data = await res.json();
-                    if (Array.isArray(data) && data.length > 0) {
-                        const matched = (cityHint && data.find(d => (d.display_name || '').includes(cityHint))) || data[0];
-                        const coords = { lat: parseFloat(matched.lat), lon: parseFloat(matched.lon) };
-                        if (!isNaN(coords.lat) && !isNaN(coords.lon)) {
-                            savePlaceCoords(cleanName, coords.lat, coords.lon);
-                            return coords;
-                        }
+                    if (ncpResult && !isNaN(ncpResult.lat) && !isNaN(ncpResult.lon)) {
+                        savePlaceCoords(cleanName, ncpResult.lat, ncpResult.lon);
+                        return ncpResult;
                     }
-                } catch (e) {}
-            }
+                }
 
-            // 3. Photon POI 지오코딩 폴백 (역, 관광지, 상점명 보조 검색)
+                // 검색어 후보 목록 생성 (원문 -> 띄어쓰기 보정 -> 도시명 결합)
+                const cityHint = (tripMeta.city || '').trim();
+                const spacedVariant = buildKoreanSpacingVariant(cleanName);
+                const queries = [cleanName];
+                if (spacedVariant) queries.push(spacedVariant);
+                if (cityHint && cityHint !== 'Seoul' && !cleanName.includes(cityHint)) {
+                    queries.push(`${cityHint} ${cleanName}`);
+                    if (spacedVariant) queries.push(`${cityHint} ${spacedVariant}`);
+                }
+
+                // 2. 실시간 POI / 주소 지오코딩 (Nominatim - 쿼리 파라미터로 언어 지정하여 CORS 프리플라이트 방지)
+                for (const q of queries) {
+                    try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=3&addressdetails=1&accept-language=ko,en`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                const matched = (cityHint && data.find(d => (d.display_name || '').includes(cityHint))) || data[0];
+                                const coords = { lat: parseFloat(matched.lat), lon: parseFloat(matched.lon) };
+                                if (!isNaN(coords.lat) && !isNaN(coords.lon)) {
+                                    savePlaceCoords(cleanName, coords.lat, coords.lon);
+                                    return coords;
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                }
+
+                // 3. Photon POI 지오코딩 폴백 (역, 해수욕장, 관광지 보조 검색)
+                for (const q of queries.slice(0, 2)) {
+                    try {
+                        const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=3`);
+                        if (photonRes.ok) {
+                            const photonData = await photonRes.json();
+                            if (photonData && Array.isArray(photonData.features) && photonData.features.length > 0) {
+                                const feat = photonData.features[0];
+                                const [lon, lat] = feat.geometry?.coordinates || [];
+                                if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
+                                    savePlaceCoords(cleanName, lat, lon);
+                                    return { lat: Number(lat), lon: Number(lon) };
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                }
+
+                // 4. 도시/공항 코드 정확 일치 폴백
+                const preset = resolvePresetLocation(cleanName);
+                if (preset) {
+                    savePlaceCoords(cleanName, preset.lat, preset.lon);
+                    return { lat: preset.lat, lon: preset.lon };
+                }
+
+                return null;
+            })();
+
+            pendingGeocodePromises[normKey] = task;
             try {
-                const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(cleanName)}&limit=3`);
-                const photonData = await photonRes.json();
-                if (photonData && Array.isArray(photonData.features) && photonData.features.length > 0) {
-                    const feat = photonData.features[0];
-                    const [lon, lat] = feat.geometry?.coordinates || [];
-                    if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
-                        savePlaceCoords(cleanName, lat, lon);
-                        return { lat: Number(lat), lon: Number(lon) };
-                    }
-                }
-            } catch (e) {}
-
-            // 4. 도시/공항 코드 정확 일치 폴백
-            const preset = resolvePresetLocation(cleanName);
-            if (preset) {
-                savePlaceCoords(cleanName, preset.lat, preset.lon);
-                return { lat: preset.lat, lon: preset.lon };
+                return await task;
+            } finally {
+                delete pendingGeocodePromises[normKey];
             }
-
-            return null;
         }
 
         async function openNaverRouteBetween(fromTitle, toTitle) {
@@ -1320,665 +1318,369 @@
             const destName = (toTitle || '').trim();
             if (!originName || !destName) return;
 
-            currentNaverRouteState = {
-                originName,
-                destName,
-                fromCoords: null,
-                toCoords: null,
-                routeCoords: null,
-                distanceMeters: null,
-                durationSeconds: null,
-                transitPlans: [],
-                selectedPlanIdx: 0,
-                isExactTransitApi: false,
-                odsayErrorMsg: '',
-                mode: 'transit'
-            };
-
-            document.getElementById('nr-origin-text').textContent = originName;
-            document.getElementById('nr-dest-text').textContent = destName;
-            document.getElementById('nr-subtitle').textContent = `${originName} → ${destName}`;
-            document.getElementById('nr-map-container').innerHTML = `<div class="text-xs text-slate-400 animate-pulse">📍 네이버 지도 좌표 및 대중교통 노선 탐색 중...</div>`;
-            document.getElementById('nr-route-details').innerHTML = `<div class="text-xs text-slate-400 text-center py-3 animate-pulse">지하철 호선 · 버스 노선 및 소요시간을 조회하고 있습니다...</div>`;
-            updateRouteModeButtons('transit');
-            document.getElementById('naver-route-modal').classList.remove('hidden');
-
-            const [fromCoords, toCoords] = await Promise.all([
-                geocodePlaceForNaver(originName),
-                geocodePlaceForNaver(destName)
-            ]);
-
-            currentNaverRouteState.fromCoords = fromCoords;
-            currentNaverRouteState.toCoords = toCoords;
-
-            if (fromCoords && toCoords) {
-                // 1. 도로 경로 및 거리/시간 조회
-                const osrmPromise = (async () => {
-                    try {
-                        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${fromCoords.lon},${fromCoords.lat};${toCoords.lon},${toCoords.lat}?overview=full&geometries=geojson`;
-                        const res = await fetch(osrmUrl);
-                        const data = await res.json();
-                        if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                            const route = data.routes[0];
-                            currentNaverRouteState.distanceMeters = route.distance;
-                            currentNaverRouteState.durationSeconds = route.duration;
-                            currentNaverRouteState.routeCoords = route.geometry.coordinates.map(([lon, lat]) => ({ lat, lon }));
-                        }
-                    } catch (e) {}
-                    if (!currentNaverRouteState.distanceMeters) {
-                        currentNaverRouteState.distanceMeters = calcHaversineMeters(fromCoords, toCoords);
-                    }
-                })();
-
-                // 2. 대중교통 상세 노선(지하철 호선 / 버스 번호 / 승하차 정류장 / 소요시간) 조회
-                const transitPromise = fetchDetailedTransitPlans(fromCoords, toCoords, originName, destName);
-
-                await Promise.all([osrmPromise, transitPromise]);
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            let pendingWin = null;
+            if (!isMobile) {
+                // 비동기 좌표 조회 시 브라우저 팝업 차단을 방지하기 위해 빈 탭을 먼저 확보
+                pendingWin = window.open('about:blank', '_blank');
             }
 
-            renderNaverRoutePreview();
-        }
+            showToast('네이버 지도 길찾기로 연결 중...');
 
-        let currentNaverRouteState = null;
+            // Nominatim 동시 요청 제한 방지를 위해 순차 조회
+            const fromCoords = await geocodePlaceForNaver(originName);
+            const toCoords = await geocodePlaceForNaver(destName);
 
-        function getSubwayLineColor(lineName) {
-            const s = (lineName || '').replace(/\s+/g, '');
-            if (s.includes('1호선')) return '#0052A4';
-            if (s.includes('2호선')) return '#00A84D';
-            if (s.includes('3호선')) return '#EF7C1C';
-            if (s.includes('4호선')) return '#00A5DE';
-            if (s.includes('5호선')) return '#996CAC';
-            if (s.includes('6호선')) return '#CD7C2F';
-            if (s.includes('7호선')) return '#747F00';
-            if (s.includes('8호선')) return '#E6186C';
-            if (s.includes('9호선')) return '#BDB092';
-            if (s.includes('신분당')) return '#D4003B';
-            if (s.includes('경의중앙')) return '#77C4A3';
-            if (s.includes('수인분당') || s.includes('분당')) return '#F5A200';
-            if (s.includes('공항철도')) return '#0090D2';
-            if (s.includes('GTX')) return '#9A6292';
-            return '#03C75A';
-        }
+            // 네이버 지도 공식 WGS84 길찾기 URL (자동으로 네이버 지도 대중교통 길찾기 화면으로 변환)
+            const webDirectionsUrl = (fromCoords && toCoords)
+                ? `https://map.naver.com/index.nhn?slng=${fromCoords.lon}&slat=${fromCoords.lat}&stext=${encodeURIComponent(originName)}&elng=${toCoords.lon}&elat=${toCoords.lat}&etext=${encodeURIComponent(destName)}&menu=route&pathType=1`
+                : `https://map.naver.com/index.nhn?stext=${encodeURIComponent(originName)}&etext=${encodeURIComponent(destName)}&menu=route&pathType=1`;
 
-        function getOdsaySubwayColor(subwayCode, lineName) {
-            const codeMap = {
-                1: '#0052A4', 2: '#00A84D', 3: '#EF7C1C', 4: '#00A5DE',
-                5: '#996CAC', 6: '#CD7C2F', 7: '#747F00', 8: '#E6186C',
-                9: '#BDB092', 101: '#0090D2', 104: '#77C4A3', 108: '#0C8E72',
-                109: '#D4003B', 116: '#F5A200',
-                // 부산 지하철
-                21: '#F06A00', 22: '#81BF48', 23: '#BB8C00', 24: '#217DCB',
-                // 대구·대전·광주
-                31: '#D93F5C', 32: '#3CB44A', 33: '#FFBE00', 41: '#007448', 51: '#009088'
-            };
-            return codeMap[subwayCode] || getSubwayLineColor(lineName);
-        }
-
-        function getOdsayBusBadgeColor(busType) {
-            // 1:일반, 2:좌석, 3:마을, 4:직행좌석, 5:공항, 6:간선급행, 11:간선, 12:지선, 14:광역, 15:급행
-            if ([4, 6, 14, 15].includes(busType)) return '#ef4444'; // 급행/광역/직행 (레드)
-            if ([12, 3].includes(busType)) return '#10b981';       // 지선/마을 (그린)
-            if (busType === 5) return '#8b5cf6';                   // 공항버스 (퍼플)
-            return '#2563eb';                                      // 간선/일반 (블루)
-        }
-
-        function parseOdsayTransitPaths(paths, originName, destName) {
-            const pathTypeLabels = { 1: '지하철', 2: '버스', 3: '버스+지하철' };
-            return paths.slice(0, 4).map((p, idx) => {
-                const info = p.info || {};
-                const totalMinutes = info.totalTime || 1;
-                const payment = info.payment || 0;
-                const transitCount = (info.busTransitCount || 0) + (info.subwayTransitCount || 0);
-                const transfers = Math.max(0, transitCount - 1);
-                const arrivalDate = new Date(Date.now() + totalMinutes * 60000);
-                const arrivalStr = arrivalDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-
-                let walkMinsSum = 0;
-                const steps = [];
-                const subPaths = Array.isArray(p.subPath) ? p.subPath : [];
-
-                subPaths.forEach((sp, spIdx) => {
-                    const secTime = sp.sectionTime || 0;
-                    if (sp.trafficType === 1) {
-                        // 지하철
-                        const lane = sp.lane?.[0] || {};
-                        const lineName = lane.name || '지하철';
-                        const startSt = sp.startName ? (sp.startName.endsWith('역') ? sp.startName : `${sp.startName}역`) : '승차역';
-                        const endSt = sp.endName ? (sp.endName.endsWith('역') ? sp.endName : `${sp.endName}역`) : '하차역';
-                        steps.push({
-                            type: 'subway',
-                            badge: lineName,
-                            color: getOdsaySubwayColor(lane.subwayCode, lineName),
-                            from: startSt,
-                            to: endSt,
-                            detail: `${secTime}분 · ${sp.stationCount || 0}정거장`,
-                            minutes: Math.max(1, secTime)
-                        });
-                    } else if (sp.trafficType === 2) {
-                        // 버스
-                        const lanes = Array.isArray(sp.lane) ? sp.lane : [];
-                        const busNos = lanes.map(l => l.busNo).filter(Boolean);
-                        const firstType = lanes[0]?.type || 11;
-                        steps.push({
-                            type: 'bus',
-                            badge: busNos.length > 0 ? busNos.join(', ') : '버스',
-                            color: getOdsayBusBadgeColor(firstType),
-                            from: sp.startName || '승차 정류장',
-                            to: sp.endName || '하차 정류장',
-                            detail: `${secTime}분 · ${sp.stationCount || 0}정거장`,
-                            minutes: Math.max(1, secTime)
-                        });
-                    } else if (sp.trafficType === 3) {
-                        // 도보
-                        const wMin = Math.max(1, secTime || Math.round((sp.distance || 60) / 67));
-                        walkMinsSum += wMin;
-                        const nextSp = subPaths[spIdx + 1];
-                        let walkText = `도보 이동 (${wMin}분)`;
-                        if (spIdx === 0 && nextSp?.startName) {
-                            walkText = `${originName} → ${nextSp.startName} (도보 ${wMin}분)`;
-                        } else if (spIdx === subPaths.length - 1) {
-                            walkText = `${destName}까지 도보 (${wMin}분)`;
-                        } else if (nextSp?.startName) {
-                            walkText = `${nextSp.startName} 환승 이동 (도보 ${wMin}분)`;
-                        }
-                        steps.push({
-                            type: 'walk',
-                            badge: '도보',
-                            color: '#64748b',
-                            detail: walkText,
-                            minutes: wMin
-                        });
-                    }
-                });
-
-                const typeTag = pathTypeLabels[p.pathType] || '대중교통';
-                return {
-                    label: idx === 0 ? `최적 · ${typeTag}` : `${typeTag} ${idx + 1}`,
-                    totalMinutes,
-                    arrivalStr,
-                    transfers,
-                    fare: `${payment.toLocaleString()}원`,
-                    walkMinutes: walkMinsSum || Math.max(1, Math.round((info.totalWalk || 0) / 67)),
-                    steps
-                };
-            });
-        }
-
-        async function fetchNearbyTransitStops(coords) {
-            try {
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 3200);
-                const query = `[out:json][timeout:3];(node["station"="subway"](around:1500,${coords.lat},${coords.lon});node["railway"="station"](around:1500,${coords.lat},${coords.lon});node["highway"="bus_stop"](around:650,${coords.lat},${coords.lon}););out body 12;`;
-                const res = await fetch('https://overpass-api.de/api/interpreter', {
-                    method: 'POST',
-                    body: query,
-                    signal: controller.signal
-                });
-                clearTimeout(timer);
-                const data = await res.json();
-                const elements = Array.isArray(data.elements) ? data.elements : [];
-
-                const subways = [];
-                const buses = [];
-                elements.forEach(el => {
-                    const tags = el.tags || {};
-                    const name = tags.name || tags['name:ko'];
-                    if (!name) return;
-                    const dist = Math.round(calcHaversineMeters(coords, { lat: el.lat, lon: el.lon }));
-                    if (tags.station === 'subway' || tags.railway === 'station') {
-                        const rawLine = tags.line || tags.network || '';
-                        const lineMatch = rawLine.match(/([1-9]호선|신분당선|수인분당선|경의중앙선|공항철도|경춘선|신림선|우이신설선)/);
-                        subways.push({
-                            name: name.endsWith('역') ? name : `${name}역`,
-                            line: lineMatch ? lineMatch[1] : '지하철',
-                            dist
-                        });
-                    } else if (tags.highway === 'bus_stop') {
-                        const routeRefs = (tags.route_ref || tags.ref || '').split(/[;,]/).map(r => r.trim()).filter(Boolean);
-                        buses.push({
-                            name,
-                            routes: routeRefs,
-                            dist
-                        });
-                    }
-                });
-
-                subways.sort((a, b) => a.dist - b.dist);
-                buses.sort((a, b) => a.dist - b.dist);
-                return { subways, buses };
-            } catch (e) {
-                return { subways: [], buses: [] };
+            if (isMobile) {
+                const appSchemeUrl = (fromCoords && toCoords)
+                    ? `nmap://route/public?slat=${fromCoords.lat}&slng=${fromCoords.lon}&sname=${encodeURIComponent(originName)}&dlat=${toCoords.lat}&dlng=${toCoords.lon}&dname=${encodeURIComponent(destName)}&appname=travel.planner.v1`
+                    : `nmap://route/public?sname=${encodeURIComponent(originName)}&dname=${encodeURIComponent(destName)}&appname=travel.planner.v1`;
+                window.location.href = appSchemeUrl;
+                setTimeout(() => {
+                    window.open(webDirectionsUrl, '_blank', 'noopener,noreferrer');
+                }, 900);
+            } else if (pendingWin && !pendingWin.closed) {
+                pendingWin.location.href = webDirectionsUrl;
+            } else {
+                window.open(webDirectionsUrl, '_blank', 'noopener,noreferrer');
             }
         }
 
-        async function fetchDetailedTransitPlans(fromCoords, toCoords, originName, destName) {
-            // 1순위: ODsay 대중교통 길찾기 API 연동 (API 키 설정 시 실제 버스 번호·지하철 호선·정류장·요금·도착시각 조회)
-            if (odsayApiKey) {
-                try {
-                    const url = `https://api.odsay.com/v1/api/searchPubTransPathT?SX=${fromCoords.lon}&SY=${fromCoords.lat}&EX=${toCoords.lon}&EY=${toCoords.lat}&apiKey=${encodeURIComponent(odsayApiKey)}`;
-                    const res = await fetch(url);
-                    const data = await res.json();
+        /* --- 구글 드라이브 백업 & 자동 동기화 엔진 --- */
+        function initGoogleDriveSync() {
+            const toggle = document.getElementById('gdrive-autosync-toggle');
+            if (toggle) toggle.checked = gdriveAutoSync;
+            updateGdriveUI(false);
+        }
 
-                    if (data && !data.error && Array.isArray(data?.result?.path) && data.result.path.length > 0) {
-                        currentNaverRouteState.transitPlans = parseOdsayTransitPaths(data.result.path, originName, destName);
-                        currentNaverRouteState.isExactTransitApi = true;
-                        currentNaverRouteState.odsayErrorMsg = '';
-                        return;
-                    } else if (data?.error) {
-                        const errObj = Array.isArray(data.error) ? data.error[0] : data.error;
-                        currentNaverRouteState.odsayErrorMsg = errObj?.msg || 'ODsay API 응답 오류 (콘솔 웹 서비스 URL 등록 확인 필요)';
-                    }
-                } catch (e) {
-                    currentNaverRouteState.odsayErrorMsg = 'ODsay 네트워크 연결 실패 (기본 경로로 대체 표시)';
+        function toggleGdriveAutoSync(enabled) {
+            gdriveAutoSync = Boolean(enabled);
+            safeStorage.setItem('tp_gdrive_autosync', String(gdriveAutoSync));
+            showToast(gdriveAutoSync ? '구글 드라이브 자동 동기화가 켜졌습니다.' : '구글 드라이브 자동 동기화가 꺼졌습니다.');
+        }
+
+        function updateGdriveUI(connected, statusText = '') {
+            const badge = document.getElementById('gdrive-status-badge');
+            const connView = document.getElementById('gdrive-connected-view');
+            const emailEl = document.getElementById('gdrive-account-email');
+            const lastSyncEl = document.getElementById('gdrive-last-sync');
+
+            if (connected) {
+                if (badge) {
+                    badge.textContent = statusText || '연결됨';
+                    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
                 }
-            }
-
-            // 2순위: ODsay 키 미설정 또는 호출 제한 시 주변 실제 지하철역(호선) 및 버스 정류장 실시간 탐색 폴백
-            const distMeters = currentNaverRouteState.distanceMeters || calcHaversineMeters(fromCoords, toCoords);
-            const [originStops, destStops] = await Promise.all([
-                fetchNearbyTransitStops(fromCoords),
-                fetchNearbyTransitStops(toCoords)
-            ]);
-
-            const startSub = originStops.subways[0];
-            const endSub = destStops.subways[0];
-            const startBus = originStops.buses[0];
-            const endBus = destStops.buses[0];
-
-            const plans = [];
-            const baseRideMins = Math.max(4, Math.round((distMeters / 1000) / 26 * 60));
-
-            // 플랜 1: 지하철 중심 경로
-            if (startSub && endSub && startSub.name !== endSub.name) {
-                const walk1 = Math.max(2, Math.round(startSub.dist / 67));
-                const walk2 = Math.max(2, Math.round(endSub.dist / 67));
-                const sameLine = startSub.line === endSub.line && startSub.line !== '지하철';
-                const estStations = Math.max(2, Math.round(distMeters / 1150));
-                const totalMins = walk1 + baseRideMins + walk2 + (sameLine ? 0 : 4);
-
-                const steps = [
-                    { type: 'walk', badge: '도보', color: '#64748b', detail: `${originName} → ${startSub.name} (도보 ${walk1}분)`, minutes: walk1 },
-                    {
-                        type: 'subway',
-                        badge: startSub.line,
-                        color: getSubwayLineColor(startSub.line),
-                        from: startSub.name,
-                        to: endSub.name,
-                        detail: `${estStations}개역 이동 · 약 ${baseRideMins}분`,
-                        minutes: baseRideMins
-                    }
-                ];
-                if (!sameLine && endSub.line !== '지하철') {
-                    steps.push({
-                        type: 'subway',
-                        badge: `${endSub.line} 환승`,
-                        color: getSubwayLineColor(endSub.line),
-                        from: '환승역',
-                        to: endSub.name,
-                        detail: `환승 이동 포함 · 약 4분`,
-                        minutes: 4
-                    });
+                if (connView) connView.classList.remove('hidden');
+                if (emailEl) emailEl.textContent = gdriveUserEmail || 'Google 계정 연결됨';
+                if (lastSyncEl && statusText) lastSyncEl.textContent = statusText;
+            } else {
+                if (badge) {
+                    badge.textContent = '미연결';
+                    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
                 }
-                steps.push({ type: 'walk', badge: '도보', color: '#64748b', detail: `${endSub.name} → ${destName} (도보 ${walk2}분)`, minutes: walk2 });
-
-                plans.push({
-                    label: '추천 · 지하철',
-                    totalMinutes: totalMins,
-                    transfers: sameLine ? 0 : 1,
-                    fare: distMeters > 10000 ? '1,500원~' : '1,400원',
-                    walkMinutes: walk1 + walk2,
-                    steps
-                });
+                if (connView) connView.classList.add('hidden');
             }
-
-            // 플랜 2: 버스 중심 경로
-            const busWalk1 = startBus ? Math.max(1, Math.round(startBus.dist / 67)) : 3;
-            const busWalk2 = endBus ? Math.max(1, Math.round(endBus.dist / 67)) : 3;
-            const busRideMins = Math.max(5, Math.round((distMeters / 1000) / 20 * 60) + 3);
-            const estBusStops = Math.max(2, Math.round(distMeters / 550));
-            const detectedBusNos = (startBus?.routes?.length ? startBus.routes : (endBus?.routes || [])).slice(0, 3);
-            const busBadgeText = detectedBusNos.length > 0 ? `${detectedBusNos.join(', ')}번 버스` : '간선·지선 버스';
-
-            plans.push({
-                label: plans.length === 0 ? '추천 · 버스' : '버스 이용',
-                totalMinutes: busWalk1 + busRideMins + busWalk2,
-                transfers: 0,
-                fare: '1,500원',
-                walkMinutes: busWalk1 + busWalk2,
-                steps: [
-                    { type: 'walk', badge: '도보', color: '#64748b', detail: `${startBus ? startBus.name : '인근 버스정류장'}까지 도보 ${busWalk1}분`, minutes: busWalk1 },
-                    {
-                        type: 'bus',
-                        badge: busBadgeText,
-                        color: '#2563eb',
-                        from: startBus ? startBus.name : `${originName} 정류장`,
-                        to: endBus ? endBus.name : `${destName} 정류장`,
-                        detail: `약 ${estBusStops}정거장 이동 · 약 ${busRideMins}분`,
-                        minutes: busRideMins
-                    },
-                    { type: 'walk', badge: '도보', color: '#64748b', detail: `${destName}까지 도보 ${busWalk2}분`, minutes: busWalk2 }
-                ]
-            });
-
-            currentNaverRouteState.isExactTransitApi = false;
-            currentNaverRouteState.transitPlans = plans;
         }
 
-        function selectTransitPlan(idx) {
-            if (!currentNaverRouteState) return;
-            currentNaverRouteState.selectedPlanIdx = idx;
-            renderNaverRoutePreview();
-        }
-
-        function calcHaversineMeters(c1, c2) {
-            const R = 6371000;
-            const toRad = (deg) => deg * Math.PI / 180;
-            const dLat = toRad(c2.lat - c1.lat);
-            const dLon = toRad(c2.lon - c1.lon);
-            const a = Math.sin(dLat / 2) ** 2 +
-                      Math.cos(toRad(c1.lat)) * Math.cos(toRad(c2.lat)) * Math.sin(dLon / 2) ** 2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-
-        function formatDistanceText(meters) {
-            if (!meters || isNaN(meters)) return '거리 계산 중';
-            if (meters < 1000) return `${Math.round(meters)}m`;
-            return `${(meters / 1000).toFixed(1)}km`;
-        }
-
-        function formatDurationText(minutes) {
-            const mins = Math.max(1, Math.round(minutes));
-            if (mins < 60) return `약 ${mins}분`;
-            const h = Math.floor(mins / 60);
-            const m = mins % 60;
-            return m > 0 ? `약 ${h}시간 ${m}분` : `약 ${h}시간`;
-        }
-
-        function updateRouteModeButtons(activeMode) {
-            document.querySelectorAll('.nr-mode-btn').forEach(btn => {
-                const isSelected = btn.dataset.rmode === activeMode;
-                btn.className = isSelected
-                    ? 'nr-mode-btn flex-1 py-2 rounded-xl text-xs font-extrabold border-2 border-[#03C75A] bg-[#03C75A]/10 text-[#02a84b] dark:text-[#23d973] transition'
-                    : 'nr-mode-btn flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#03C75A]/50 transition';
-            });
-        }
-
-        function switchRoutePreviewMode(mode) {
-            if (!currentNaverRouteState) return;
-            currentNaverRouteState.mode = mode;
-            updateRouteModeButtons(mode);
-            renderNaverRoutePreview();
-        }
-
-        function renderNaverRoutePreview() {
-            if (!currentNaverRouteState) return;
-            const { originName, destName, fromCoords, toCoords, routeCoords, distanceMeters, durationSeconds, transitPlans, selectedPlanIdx, isExactTransitApi, odsayErrorMsg, mode } = currentNaverRouteState;
-            const mapBox = document.getElementById('nr-map-container');
-            const detailBox = document.getElementById('nr-route-details');
-
-            if (!fromCoords || !toCoords) {
-                mapBox.innerHTML = `
-                    <div class="text-center p-4 space-y-1.5">
-                        <span class="text-2xl block">🗺️</span>
-                        <p class="text-xs font-bold text-slate-700 dark:text-slate-200">세부 좌표 자동 변환이 제한된 장소입니다</p>
-                        <p class="text-[11px] text-slate-400">아래 버튼을 누르면 네이버 지도 앱에서 직접 경로를 탐색합니다.</p>
-                    </div>`;
-                detailBox.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-extrabold text-[#03C75A]">네이버 지도 통합 검색 경로</span>
-                        <span class="text-[11px] text-slate-400">실시간 교통 반영</span>
-                    </div>
-                    <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                        <strong>${escapeHTML(originName)}</strong>에서 <strong>${escapeHTML(destName)}</strong>까지의 버스·지하철 노선과 정확한 시간은 네이버 지도 앱에서 바로 확인하실 수 있습니다.
-                    </p>`;
+        function ensureGoogleDriveAuth(onAuthenticated) {
+            if (gdriveAccessToken) {
+                if (typeof onAuthenticated === 'function') onAuthenticated();
                 return;
             }
 
-            // 1. 추천 경로 요약 및 구간별 상세 카드 렌더링
-            const distText = formatDistanceText(distanceMeters);
-            const carMins = durationSeconds ? (durationSeconds / 60) : ((distanceMeters / 1000) / 28 * 60 + 4);
-            const walkMins = (distanceMeters / 67);
-
-            if (mode === 'transit') {
-                const plans = transitPlans && transitPlans.length > 0 ? transitPlans : [];
-                const activePlan = plans[selectedPlanIdx] || plans[0];
-
-                if (activePlan) {
-                    const planTabsHtml = plans.length > 1 ? `
-                        <div class="flex gap-1.5 pb-2.5 mb-2.5 border-b border-slate-200/70 dark:border-slate-700/70 overflow-x-auto scrollbar-hide">
-                            ${plans.map((p, i) => `
-                                <button type="button" onclick="selectTransitPlan(${i})" class="px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition flex items-center gap-1.5 ${
-                                    i === selectedPlanIdx
-                                        ? 'bg-[#03C75A] text-white shadow-2xs'
-                                        : 'bg-white dark:bg-darkCard text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                                }">
-                                    <span>${escapeHTML(p.label)}</span>
-                                    <span class="opacity-90">${p.totalMinutes}분</span>
-                                </button>
-                            `).join('')}
-                        </div>` : '';
-
-                    const stepsHtml = (activePlan.steps || []).map(step => {
-                        if (step.type === 'walk') {
-                            return `
-                            <div class="flex items-center gap-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400">
-                                <span class="w-5 h-5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300 inline-flex items-center justify-center text-[10px] flex-shrink-0">🚶</span>
-                                <span class="truncate">${escapeHTML(step.detail)}</span>
-                            </div>`;
-                        }
-                        const iconChar = step.type === 'subway' ? '🚇' : '🚌';
-                        return `
-                        <div class="bg-white dark:bg-darkCard rounded-xl p-2.5 border border-slate-200/70 dark:border-slate-700/80 space-y-1">
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-white text-[11px] font-extrabold" style="background-color: ${step.color}">
-                                    <span>${iconChar}</span>
-                                    <span>${escapeHTML(step.badge)}</span>
-                                </span>
-                                <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">${escapeHTML(step.detail)}</span>
-                            </div>
-                            <div class="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 pt-0.5">
-                                <span class="truncate">${escapeHTML(step.from)}</span>
-                                <span class="text-slate-400">→</span>
-                                <span class="truncate">${escapeHTML(step.to)}</span>
-                            </div>
-                        </div>`;
-                    }).join('');
-
-                    const totalBarMins = Math.max(activePlan.totalMinutes || 1, 1);
-                    const segmentBarHtml = (activePlan.steps || []).length > 0 ? `
-                        <div class="flex w-full rounded-full overflow-hidden gap-0.5 bg-slate-200/70 dark:bg-slate-700/70 my-1">
-                            ${(activePlan.steps || []).map(st => {
-                                const pct = Math.max(Math.round(((st.minutes || 1) / totalBarMins) * 100), 10);
-                                if (st.type === 'walk') {
-                                    return `<div style="width:${pct}%" class="bg-slate-300 dark:bg-slate-600 text-slate-700 dark:text-slate-200 text-[10px] font-bold flex items-center justify-center py-0.5 truncate">🚶${st.minutes}분</div>`;
-                                }
-                                return `<div style="width:${pct}%;background-color:${st.color}" class="text-white text-[10px] font-extrabold flex items-center justify-center py-0.5 truncate">${st.minutes}분</div>`;
-                            }).join('')}
-                        </div>` : '';
-
-                    detailBox.innerHTML = `
-                        ${planTabsHtml}
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-baseline gap-2">
-                                <span class="text-2xl font-black text-slate-900 dark:text-white">${formatDurationText(activePlan.totalMinutes)}</span>
-                                ${activePlan.arrivalStr ? `<span class="text-xs font-semibold text-slate-500 dark:text-slate-400">${escapeHTML(activePlan.arrivalStr)} 도착</span>` : ''}
-                                <span class="text-xs font-bold text-[#02a84b] dark:text-[#23d973]">${activePlan.transfers === 0 ? '환승 없음' : `환승 ${activePlan.transfers}회`}</span>
-                            </div>
-                            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">도보 ${activePlan.walkMinutes}분 · ${escapeHTML(activePlan.fare)}</span>
-                        </div>
-                        ${segmentBarHtml}
-                        <div class="space-y-1.5 pt-1.5">
-                            ${stepsHtml}
-                        </div>
-                        <p class="text-[10px] ${isExactTransitApi ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-400'} pt-1">
-                            ${isExactTransitApi
-                                ? '✓ ODsay 실시간 대중교통 노선 API 연동 결과'
-                                : (odsayErrorMsg
-                                    ? `※ ODsay 알림: ${escapeHTML(odsayErrorMsg)} (주변 역·정류장 기반 대체 표시)`
-                                    : '※ 주변 역·정류장 기반 추정 경로 ([설정]에서 ODsay API Key 등록 시 실제 노선 조회)')}
-                        </p>
-                    `;
-                }
-            } else if (mode === 'car') {
-                const estTaxiFare = Math.max(4800, Math.round((4800 + Math.max(0, distanceMeters - 1600) / 131 * 100) / 100) * 100);
-                detailBox.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <span class="px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-300 text-[11px] font-extrabold">추천 자동차 경로</span>
-                        <span class="text-[11px] font-bold text-slate-400">총 거리 ${distText}</span>
-                    </div>
-                    <div class="flex items-baseline justify-between pt-0.5">
-                        <span class="text-2xl font-black text-slate-900 dark:text-white">${formatDurationText(carMins)}</span>
-                        <span class="text-xs font-bold text-slate-600 dark:text-slate-300">예상 택시비 약 ${estTaxiFare.toLocaleString()}원</span>
-                    </div>
-                `;
-            } else {
-                const kcal = Math.max(5, Math.round(walkMins * 3.8));
-                detailBox.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <span class="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-300 text-[11px] font-extrabold">추천 도보 경로</span>
-                        <span class="text-[11px] font-bold text-slate-400">총 거리 ${distText}</span>
-                    </div>
-                    <div class="flex items-baseline justify-between pt-0.5">
-                        <span class="text-2xl font-black text-slate-900 dark:text-white">${formatDurationText(walkMins)}</span>
-                        <span class="text-xs font-bold text-slate-600 dark:text-slate-300">약 ${kcal} kcal 소모</span>
-                    </div>
-                `;
+            if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) {
+                showToast('Google 로그인 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', true);
+                return;
             }
 
-            // 2. 지도 렌더링: NCP Naver Maps JS API v3 활성 시 네이티브 지도 사용, 미설정/인증오류 시 벡터 경로 미니맵 렌더링
-            let renderedNativeMap = false;
-            if (window.naver && window.naver.maps && !naverAuthFailed) {
+            pendingGdriveAction = onAuthenticated;
+
+            try {
+                if (!gdriveTokenClient) {
+                    gdriveTokenClient = window.google.accounts.oauth2.initTokenClient({
+                        client_id: GDRIVE_CLIENT_ID,
+                        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+                        callback: async (tokenResponse) => {
+                            if (tokenResponse.error) {
+                                pendingGdriveAction = null;
+                                showToast('Google 계정 인증이 취소되었거나 실패했습니다.', true);
+                                return;
+                            }
+                            gdriveAccessToken = tokenResponse.access_token;
+                            await fetchGdriveUserEmail();
+                            updateGdriveUI(true, '연결 완료');
+
+                            const action = pendingGdriveAction;
+                            pendingGdriveAction = null;
+                            if (typeof action === 'function') {
+                                action();
+                            }
+                        }
+                    });
+                }
+                gdriveTokenClient.requestAccessToken({ prompt: '' });
+            } catch (e) {
+                pendingGdriveAction = null;
+                showToast('Google OAuth 인증 요청 중 오류가 발생했습니다.', true);
+            }
+        }
+
+        async function fetchGdriveUserEmail() {
+            if (!gdriveAccessToken) return;
+            try {
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
+                });
+                const info = await res.json();
+                if (info && info.email) {
+                    gdriveUserEmail = info.email;
+                }
+            } catch (e) {}
+        }
+
+        function disconnectGoogleDrive() {
+            if (gdriveAccessToken && window.google?.accounts?.oauth2) {
                 try {
-                    mapBox.innerHTML = `<div id="naver-native-map-canvas" class="w-full h-full"></div>`;
-                    const centerLat = (fromCoords.lat + toCoords.lat) / 2;
-                    const centerLon = (fromCoords.lon + toCoords.lon) / 2;
-                    const map = new window.naver.maps.Map('naver-native-map-canvas', {
-                        center: new window.naver.maps.LatLng(centerLat, centerLon),
-                        zoom: 13,
-                        zoomControl: false
-                    });
+                    window.google.accounts.oauth2.revoke(gdriveAccessToken, () => {});
+                } catch (e) {}
+            }
+            gdriveAccessToken = '';
+            gdriveUserEmail = '';
+            gdriveFolderId = '';
+            gdriveFileId = '';
+            safeStorage.removeItem('tp_gdrive_folder_id');
+            safeStorage.removeItem('tp_gdrive_file_id');
+            clearTimeout(gdriveSyncTimer);
+            updateGdriveUI(false);
+            showToast('구글 드라이브 연결이 해제되었습니다.');
+        }
 
-                    const startPos = new window.naver.maps.LatLng(fromCoords.lat, fromCoords.lon);
-                    const endPos = new window.naver.maps.LatLng(toCoords.lat, toCoords.lon);
+        function buildBackupObject() {
+            const itinerary = {};
+            for (let i = 1; i <= 14; i++) {
+                const val = safeStorage.getItem(`tp_itinerary_day${i}`);
+                if (val) itinerary[i] = val;
+            }
+            return {
+                version: APP_VERSION,
+                exportedAt: new Date().toISOString(),
+                meta: tripMeta,
+                flight: flightInfo,
+                checklist: checklistData,
+                places: placesData,
+                schedules: schedules,
+                itinerary: itinerary
+            };
+        }
 
-                    new window.naver.maps.Marker({
-                        position: startPos,
-                        map,
-                        title: originName,
-                        icon: {
-                            content: `<div style="background:#03C75A;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">출발</div>`,
-                            anchor: new window.naver.maps.Point(18, 12)
-                        }
-                    });
+        function applyBackupObject(data) {
+            if (!data) return;
+            if (data.meta) tripMeta = data.meta;
+            if (data.flight) flightInfo = data.flight;
+            if (data.checklist) checklistData = data.checklist;
+            if (data.places) placesData = data.places;
+            if (data.schedules) schedules = data.schedules;
 
-                    new window.naver.maps.Marker({
-                        position: endPos,
-                        map,
-                        title: destName,
-                        icon: {
-                            content: `<div style="background:#2563eb;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;">도착</div>`,
-                            anchor: new window.naver.maps.Point(18, 12)
-                        }
-                    });
+            safeStorage.setItem('tp_meta', JSON.stringify(tripMeta));
+            safeStorage.setItem('tp_flight', JSON.stringify(flightInfo));
+            safeStorage.setItem('tp_checklist', JSON.stringify(checklistData));
+            safeStorage.setItem('tp_places', JSON.stringify(placesData));
+            safeStorage.setItem('tp_schedules', JSON.stringify(schedules));
 
-                    const pathPoints = (routeCoords && routeCoords.length > 1)
-                        ? routeCoords.map(c => new window.naver.maps.LatLng(c.lat, c.lon))
-                        : [startPos, endPos];
+            if (data.itinerary) {
+                for (let i = 1; i <= 14; i++) {
+                    safeStorage.removeItem(`tp_itinerary_day${i}`);
+                }
+                Object.entries(data.itinerary).forEach(([day, txt]) => {
+                    safeStorage.setItem(`tp_itinerary_day${day}`, txt);
+                });
+            }
 
-                    new window.naver.maps.Polyline({
-                        map,
-                        path: pathPoints,
-                        strokeColor: mode === 'car' ? '#2563eb' : (mode === 'walk' ? '#f59e0b' : '#03C75A'),
-                        strokeWeight: 5,
-                        strokeOpacity: 0.9
-                    });
+            renderAllComponents();
+            fetchDestinationWeather();
+        }
 
-                    const bounds = new window.naver.maps.LatLngBounds(startPos, startPos);
-                    pathPoints.forEach(pt => bounds.extend(pt));
-                    map.fitBounds(bounds, { top: 32, right: 32, bottom: 32, left: 32 });
-                    renderedNativeMap = true;
-                } catch (e) {
-                    renderedNativeMap = false;
+        async function findOrCreateGdriveFolder(createIfMissing = true) {
+            if (!gdriveAccessToken) return null;
+
+            const q = encodeURIComponent(`name='${GDRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+            const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`, {
+                headers: { Authorization: `Bearer ${gdriveAccessToken}` }
+            });
+            if (searchRes.status === 401) throw new Error('UNAUTHORIZED');
+            if (searchRes.ok) {
+                const data = await searchRes.json();
+                if (data.files && data.files.length > 0) {
+                    gdriveFolderId = data.files[0].id;
+                    safeStorage.setItem('tp_gdrive_folder_id', gdriveFolderId);
+                    return gdriveFolderId;
                 }
             }
 
-            if (!renderedNativeMap) {
-                // NCP 키 미설정 또는 도메인 인증 제한 환경에서는 경로 궤적 미니맵으로 안전하게 표시
-                const pts = (routeCoords && routeCoords.length > 1) ? routeCoords : [fromCoords, toCoords];
-                const lats = pts.map(p => p.lat);
-                const lons = pts.map(p => p.lon);
-                const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-                const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-                const latSpan = Math.max(maxLat - minLat, 0.004);
-                const lonSpan = Math.max(maxLon - minLon, 0.004);
+            if (!createIfMissing) return null;
 
-                const toSvgPt = (p) => {
-                    const x = 44 + ((p.lon - minLon) / lonSpan) * 272;
-                    const y = 148 - ((p.lat - minLat) / latSpan) * 104;
-                    return `${x.toFixed(1)},${y.toFixed(1)}`;
-                };
+            const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${gdriveAccessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: GDRIVE_FOLDER_NAME,
+                    mimeType: 'application/vnd.google-apps.folder'
+                })
+            });
+            if (createRes.status === 401) throw new Error('UNAUTHORIZED');
+            if (!createRes.ok) throw new Error('Folder creation failed');
+            const created = await createRes.json();
+            gdriveFolderId = created.id;
+            safeStorage.setItem('tp_gdrive_folder_id', gdriveFolderId);
+            return gdriveFolderId;
+        }
 
-                const polylinePoints = pts.map(toSvgPt).join(' ');
-                const [sx, sy] = toSvgPt(fromCoords).split(',');
-                const [ex, ey] = toSvgPt(toCoords).split(',');
-                const strokeColor = mode === 'car' ? '#2563eb' : (mode === 'walk' ? '#f59e0b' : '#03C75A');
+        async function findGdriveBackupFile(folderId) {
+            if (!gdriveAccessToken || !folderId) return null;
+            const q = encodeURIComponent(`name='${GDRIVE_SYNC_FILENAME}' and '${folderId}' in parents and trashed=false`);
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=drive`, {
+                headers: { Authorization: `Bearer ${gdriveAccessToken}` }
+            });
+            if (res.status === 401) throw new Error('UNAUTHORIZED');
+            if (!res.ok) return null;
+            const data = await res.json();
+            return (data.files && data.files.length > 0) ? data.files[0].id : null;
+        }
 
-                mapBox.innerHTML = `
-                    <svg viewBox="0 0 360 192" class="w-full h-full bg-slate-100 dark:bg-slate-800/90">
-                        <defs>
-                            <pattern id="nr-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-                                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="currentColor" class="text-slate-200/80 dark:text-slate-700/60" stroke-width="1"/>
-                            </pattern>
-                        </defs>
-                        <rect width="360" height="192" fill="url(#nr-grid)" />
-                        <polyline points="${polylinePoints}" fill="none" stroke="${strokeColor}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" ${mode === 'walk' ? 'stroke-dasharray="6,6"' : ''} />
-                        <circle cx="${sx}" cy="${sy}" r="6" fill="#03C75A" stroke="#ffffff" stroke-width="2.5" />
-                        <rect x="${Math.max(6, Number(sx) - 18)}" y="${Math.max(6, Number(sy) - 24)}" width="36" height="16" rx="8" fill="#03C75A" />
-                        <text x="${Math.max(24, Number(sx))}" y="${Math.max(17, Number(sy) - 13)}" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="800">출발</text>
-                        <circle cx="${ex}" cy="${ey}" r="6" fill="#2563eb" stroke="#ffffff" stroke-width="2.5" />
-                        <rect x="${Math.min(318, Math.max(6, Number(ex) - 18))}" y="${Math.max(6, Number(ey) - 24)}" width="36" height="16" rx="8" fill="#2563eb" />
-                        <text x="${Math.min(336, Math.max(24, Number(ex)))}" y="${Math.max(17, Number(ey) - 13)}" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="800">도착</text>
-                    </svg>
-                    <span class="absolute bottom-2 right-2.5 text-[10px] font-semibold text-slate-400 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded-md">경로 미리보기</span>
-                `;
+        async function syncToGoogleDrive(manual = false) {
+            if (!gdriveAccessToken) {
+                if (manual) {
+                    ensureGoogleDriveAuth(() => syncToGoogleDrive(true));
+                }
+                return;
+            }
+
+            updateGdriveUI(true, `'${GDRIVE_FOLDER_NAME}' 폴더에 백업 중...`);
+            try {
+                const folderId = await findOrCreateGdriveFolder(true);
+                if (!folderId) throw new Error('Folder missing');
+
+                let targetFileId = await findGdriveBackupFile(folderId);
+                const backupPayload = JSON.stringify(buildBackupObject());
+                const metadata = targetFileId
+                    ? { name: GDRIVE_SYNC_FILENAME, mimeType: 'application/json' }
+                    : { name: GDRIVE_SYNC_FILENAME, mimeType: 'application/json', parents: [folderId] };
+
+                const boundary = 'tp_gdrive_sync_boundary_v1';
+                const multipartBody =
+                    `--${boundary}\r\n` +
+                    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+                    `${JSON.stringify(metadata)}\r\n` +
+                    `--${boundary}\r\n` +
+                    `Content-Type: application/json\r\n\r\n` +
+                    `${backupPayload}\r\n` +
+                    `--${boundary}--`;
+
+                const url = targetFileId
+                    ? `https://www.googleapis.com/upload/drive/v3/files/${targetFileId}?uploadType=multipart`
+                    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+
+                const res = await fetch(url, {
+                    method: targetFileId ? 'PATCH' : 'POST',
+                    headers: {
+                        Authorization: `Bearer ${gdriveAccessToken}`,
+                        'Content-Type': `multipart/related; boundary=${boundary}`
+                    },
+                    body: multipartBody
+                });
+
+                if (res.status === 401) throw new Error('UNAUTHORIZED');
+                if (!res.ok) throw new Error('Drive upload failed');
+
+                const result = await res.json();
+                if (result.id) {
+                    gdriveFileId = result.id;
+                    safeStorage.setItem('tp_gdrive_file_id', gdriveFileId);
+                }
+
+                const nowStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                updateGdriveUI(true, `백업 완료 (${nowStr})`);
+                if (manual) showToast(`구글 드라이브 '${GDRIVE_FOLDER_NAME}' 폴더에 백업되었습니다!`);
+            } catch (err) {
+                if (err.message === 'UNAUTHORIZED') {
+                    gdriveAccessToken = '';
+                    updateGdriveUI(false);
+                    if (manual) {
+                        ensureGoogleDriveAuth(() => syncToGoogleDrive(true));
+                    } else {
+                        showToast('구글 로그인 세션이 만료되었습니다. 다시 백업 버튼을 눌러 주세요.', true);
+                    }
+                    return;
+                }
+                updateGdriveUI(true, '백업 오류 발생');
+                if (manual) showToast('구글 드라이브 백업에 실패했습니다.', true);
             }
         }
 
-        function closeNaverRouteModal(e) {
-            if (e && e.target !== e.currentTarget) return;
-            document.getElementById('naver-route-modal').classList.add('hidden');
+        async function restoreFromGoogleDrive() {
+            if (!gdriveAccessToken) {
+                ensureGoogleDriveAuth(() => restoreFromGoogleDrive());
+                return;
+            }
+
+            updateGdriveUI(true, `'${GDRIVE_FOLDER_NAME}' 폴더에서 불러오는 중...`);
+            try {
+                const folderId = await findOrCreateGdriveFolder(false);
+                if (!folderId) {
+                    updateGdriveUI(true, '백업 폴더 없음');
+                    showToast(`구글 드라이브에 '${GDRIVE_FOLDER_NAME}' 폴더가 없습니다. 먼저 드라이브 백업을 진행해 주세요.`, true);
+                    return;
+                }
+
+                const targetId = await findGdriveBackupFile(folderId);
+                if (!targetId) {
+                    updateGdriveUI(true, '저장된 백업 데이터 없음');
+                    showToast(`'${GDRIVE_FOLDER_NAME}' 폴더에 저장된 백업 데이터가 없습니다.`, true);
+                    return;
+                }
+
+                const res = await fetch(`https://www.googleapis.com/drive/v3/files/${targetId}?alt=media`, {
+                    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
+                });
+                if (res.status === 401) throw new Error('UNAUTHORIZED');
+                if (!res.ok) throw new Error('Drive download failed');
+
+                const data = await res.json();
+                gdriveFileId = targetId;
+                safeStorage.setItem('tp_gdrive_file_id', gdriveFileId);
+
+                // 파일 다운로드가 아닌 사이트 내부 저장소(localStorage)로 즉시 반영 및 복원
+                applyBackupObject(data);
+
+                const nowStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                updateGdriveUI(true, `드라이브 다운 완료 (${nowStr})`);
+                showToast('구글 드라이브의 데이터를 사이트에 바로 불러왔습니다!');
+            } catch (err) {
+                if (err.message === 'UNAUTHORIZED') {
+                    gdriveAccessToken = '';
+                    updateGdriveUI(false);
+                    ensureGoogleDriveAuth(() => restoreFromGoogleDrive());
+                    return;
+                }
+                updateGdriveUI(true, '불러오기 실패');
+                showToast('구글 드라이브에서 데이터를 불러오지 못했습니다.', true);
+            }
         }
 
-        function launchExternalNaverMap() {
-            if (!currentNaverRouteState) return;
-            const { originName, destName, fromCoords, toCoords, mode } = currentNaverRouteState;
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            const appRouteType = mode === 'car' ? 'car' : (mode === 'walk' ? 'walk' : 'public');
-            const webRouteType = mode === 'car' ? 'car' : (mode === 'walk' ? 'walk' : 'transit');
-
-            if (fromCoords && toCoords) {
-                const webDirectionsUrl = `https://map.naver.com/p/directions/${fromCoords.lon},${fromCoords.lat},${encodeURIComponent(originName)}/${toCoords.lon},${toCoords.lat},${encodeURIComponent(destName)}/-/${webRouteType}`;
-                if (isMobile) {
-                    const appSchemeUrl = `nmap://route/${appRouteType}?slat=${fromCoords.lat}&slng=${fromCoords.lon}&sname=${encodeURIComponent(originName)}&dlat=${toCoords.lat}&dlng=${toCoords.lon}&dname=${encodeURIComponent(destName)}&appname=travel.planner.v1`;
-                    window.location.href = appSchemeUrl;
-                    setTimeout(() => {
-                        window.open(webDirectionsUrl, '_blank', 'noopener,noreferrer');
-                    }, 900);
-                } else {
-                    window.open(webDirectionsUrl, '_blank', 'noopener,noreferrer');
-                }
-            } else {
-                const webSearchRouteUrl = `https://map.naver.com/p/search/${encodeURIComponent(originName + '에서 ' + destName)}`;
-                if (isMobile) {
-                    const appNameRouteUrl = `nmap://route/${appRouteType}?sname=${encodeURIComponent(originName)}&dname=${encodeURIComponent(destName)}&appname=travel.planner.v1`;
-                    window.location.href = appNameRouteUrl;
-                    setTimeout(() => {
-                        window.open(webSearchRouteUrl, '_blank', 'noopener,noreferrer');
-                    }, 900);
-                } else {
-                    window.open(webSearchRouteUrl, '_blank', 'noopener,noreferrer');
-                }
-            }
+        function scheduleGoogleDriveAutoSync() {
+            if (!gdriveAccessToken || !gdriveAutoSync) return;
+            clearTimeout(gdriveSyncTimer);
+            gdriveSyncTimer = setTimeout(() => {
+                syncToGoogleDrive(false);
+            }, 2500);
         }
 
         function openTripSetupModal() {
@@ -2879,25 +2581,35 @@
                 // 2. 실시간 POI 장소 검색 (명소, 역, 식당, 카페 등 자동완성)
                 try {
                     const cityContext = getEffectiveWeatherCity();
+                    const spacedQ = buildKoreanSpacingVariant(q);
                     const searchTerms = [q];
+                    if (spacedQ) searchTerms.push(spacedQ);
                     if (cityContext && cityContext !== 'Seoul' && !q.includes(cityContext)) {
                         searchTerms.push(`${q} ${cityContext}`);
                     }
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerms[0])}&format=json&limit=5&addressdetails=1`, {
-                        headers: { 'Accept-Language': 'ko,en' }
-                    });
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerms[0])}&format=json&limit=5&addressdetails=1&accept-language=ko,en`);
                     const data = await res.json();
                     if (Array.isArray(data)) {
                         data.forEach(place => {
                             const primaryName = place.name || (place.display_name || '').split(',')[0].trim();
                             const subAddr = (place.display_name || '').split(',').slice(1, 4).join(',').trim();
+                            const lat = parseFloat(place.lat);
+                            const lon = parseFloat(place.lon);
+                            if (primaryName && !isNaN(lat) && !isNaN(lon)) {
+                                // 자동완성을 클릭하지 않고 직접 등록해도 좌표를 재사용할 수 있도록 임시 캐싱
+                                autocompleteCoordsTemp[primaryName] = { lat, lon };
+                                autocompleteCoordsTemp[normalizePlaceKey(primaryName)] = { lat, lon };
+                                if (!autocompleteCoordsTemp[normalizePlaceKey(q)]) {
+                                    autocompleteCoordsTemp[normalizePlaceKey(q)] = { lat, lon };
+                                }
+                            }
                             if (primaryName && !liveResults.some(r => r.name === primaryName)) {
                                 liveResults.push({
                                     name: primaryName,
                                     address: subAddr,
                                     cat: '네이버 장소',
-                                    lat: parseFloat(place.lat),
-                                    lon: parseFloat(place.lon),
+                                    lat,
+                                    lon,
                                     isNaver: true
                                 });
                             }
@@ -2950,8 +2662,11 @@
             safeStorage.setItem('tp_schedules', JSON.stringify(schedules));
             broadcastP2PUpdate('schedules', schedules);
 
-            // 자동완성을 거치지 않고 직접 입력한 장소도 백그라운드에서 좌표를 미리 확보
-            if (!placeCoordsCache[title]) {
+            // 자동완성을 거치지 않고 직접 입력한 장소도 임시 캐시 확인 또는 백그라운드에서 좌표를 미리 확보
+            const existingCoords = getCachedPlaceCoords(title);
+            if (existingCoords) {
+                savePlaceCoords(title, existingCoords.lat, existingCoords.lon);
+            } else {
                 geocodePlaceForNaver(title);
             }
 
@@ -3488,21 +3203,7 @@
 
         /* --- 데이터 백업 (JSON 내보내기 / 가져오기) & 초기화 --- */
         function exportUserData() {
-            const itinerary = {};
-            for (let i = 1; i <= 14; i++) {
-                const val = safeStorage.getItem(`tp_itinerary_day${i}`);
-                if (val) itinerary[i] = val;
-            }
-            const backup = {
-                version: APP_VERSION,
-                exportedAt: new Date().toISOString(),
-                meta: tripMeta,
-                flight: flightInfo,
-                checklist: checklistData,
-                places: placesData,
-                schedules: schedules,
-                itinerary: itinerary
-            };
+            const backup = buildBackupObject();
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -3522,26 +3223,8 @@
             reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    if (data.meta) tripMeta = data.meta;
-                    if (data.flight) flightInfo = data.flight;
-                    if (data.checklist) checklistData = data.checklist;
-                    if (data.places) placesData = data.places;
-                    if (data.schedules) schedules = data.schedules;
-
-                    safeStorage.setItem('tp_meta', JSON.stringify(tripMeta));
-                    safeStorage.setItem('tp_flight', JSON.stringify(flightInfo));
-                    safeStorage.setItem('tp_checklist', JSON.stringify(checklistData));
-                    safeStorage.setItem('tp_places', JSON.stringify(placesData));
-                    safeStorage.setItem('tp_schedules', JSON.stringify(schedules));
-
-                    if (data.itinerary) {
-                        Object.entries(data.itinerary).forEach(([day, txt]) => {
-                            safeStorage.setItem(`tp_itinerary_day${day}`, txt);
-                        });
-                    }
-
-                    renderAllComponents();
-                    fetchDestinationWeather();
+                    applyBackupObject(data);
+                    scheduleGoogleDriveAutoSync();
                     showToast('백업 데이터를 성공적으로 복원했습니다!');
                 } catch (err) {
                     showToast('올바르지 않은 JSON 파일입니다.', true);
@@ -3615,7 +3298,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             initTheme();
             initNaverMapSDK();
-            initOdsaySettings();
+            initGoogleDriveSync();
             renderAllComponents();
             fetchDestinationWeather();
         });
